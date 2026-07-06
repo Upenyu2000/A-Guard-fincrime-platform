@@ -33,6 +33,8 @@ African Guard is structured as a cloud-native FinCrime operating system. The loc
 | Dispute management | Visa Compelling Evidence 3.0 qualification checks, three-transaction evidence packages, and dispute filing agent outputs. |
 | Guided enablement | `GET /v1/training`, in-app demo walkthrough, subscriber learning paths, certifications, and facilitated training offers. |
 | Workforce optimization | Manual-hours-saved, auto-resolution, false-positive queue clearance, redeployable FTE, cost avoidance, and recommendations for moving staff into higher-value work. |
+| AgentOps governance | `GET /v1/agentops/control-plane`, `POST /v1/agentops/run-cycle`, `POST /v1/agentops/actions/:id/approve`, `POST /v1/agentops/autonomy`, policy thresholds, approval queues, and agent telemetry. |
+| Deployment readiness | `GET /v1/deployment/readiness`, `GET /v1/metrics`, production launch gates for secrets, durable storage, AgentOps governance, and observability. |
 
 ## Real-Time Flow
 
@@ -61,5 +63,8 @@ The agentic layer is designed to reduce repetitive analyst work while preserving
 - Dispute Filing Agent: assembles chargeback evidence and Visa CE 3.0 packages.
 - Agentic AML Ops: clears low-risk queues, escalates high-risk activity, and keeps audit trails.
 
-The current implementation uses deterministic demo data and in-memory agent runs. The intended production adapter boundary is a warehouse or lakehouse query layer plus governed external OSINT providers, card-network dispute APIs, and case-management persistence.
-- Secrets are represented as vault references in configuration and `.env.example`.
+Agent runs return execution plans, policy decisions, queued action IDs, and evidence references. The AgentOps control plane tracks autonomy mode, human approval thresholds, emerging patterns, queued actions, telemetry, and deployment readiness.
+
+The fraud engine also scores newer real-world attack indicators: persistent device fingerprint reuse, bot or agentic browser automation, remote access tooling, deepfake risk, and low session entropy.
+
+Local state remains deterministic for development. Production deployments should replace the in-memory store with PostgreSQL-backed repositories, Redis/Kafka stream processors, Neo4j graph writes, governed OSINT providers, card-network dispute APIs, payment-rail hold/recall adapters, and vault-managed secrets.

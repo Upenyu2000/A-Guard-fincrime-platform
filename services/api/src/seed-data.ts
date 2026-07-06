@@ -1,10 +1,12 @@
 import {
   AgentCapability,
+  AgentOpsControlPlane,
   AgentRunResult,
   Alert,
   AmlCustomerRisk,
   AuditEvent,
   DemoVideo,
+  DeploymentReadiness,
   DisputeEvidence,
   FacilitatedTrainingOffer,
   FraudTypology,
@@ -500,6 +502,191 @@ export const agentCapabilities: AgentCapability[] = [
   },
 ];
 
+export const agentOpsControlPlane: AgentOpsControlPlane = {
+  autonomyMode: "monitored",
+  policies: [
+    {
+      id: "policy-real-time-fraud-defense",
+      name: "Real-time fraud defense",
+      autonomyMode: "monitored",
+      riskThreshold: 72,
+      humanApprovalAboveRisk: 88,
+      maxAutonomousValue: 25_000,
+      allowedActions: ["step_up", "hold_payment", "create_case", "propose_rule"],
+      escalationRoles: ["fraud_investigator", "admin"],
+      description:
+        "Agents can step up or hold moderate-risk activity, but critical or high-value actions require investigator approval.",
+    },
+    {
+      id: "policy-merchant-risk",
+      name: "Merchant risk containment",
+      autonomyMode: "copilot",
+      riskThreshold: 70,
+      humanApprovalAboveRisk: 80,
+      maxAutonomousValue: 10_000,
+      allowedActions: ["propose_rule", "create_case", "share_intelligence"],
+      escalationRoles: ["fraud_investigator", "compliance_officer", "admin"],
+      description:
+        "Merchant collusion and transaction laundering recommendations are generated with evidence and held for review.",
+    },
+    {
+      id: "policy-dispute-evidence",
+      name: "Dispute evidence automation",
+      autonomyMode: "autonomous",
+      riskThreshold: 40,
+      humanApprovalAboveRisk: 90,
+      maxAutonomousValue: 5_000,
+      allowedActions: ["draft_sar", "propose_rule"],
+      escalationRoles: ["analyst", "fraud_investigator"],
+      description:
+        "Agents can assemble dispute and case evidence automatically; filing or enforcement still follows workflow approval.",
+    },
+  ],
+  telemetry: {
+    signalsMonitoredDaily: 82_400_000,
+    lastCycleAt: minutesAgo(4),
+    p95LatencyMs: 142,
+    agentPrecision: 92.4,
+    falsePositiveReduction: 41.8,
+    driftScore: 0.11,
+    queuedActions: 3,
+    autonomousActionsToday: 127,
+    humanApprovalsPending: 2,
+    casesCreatedToday: 18,
+    paymentValueHeld: 1_840_000,
+    rulesProposedToday: 5,
+  },
+  emergingPatterns: [
+    {
+      id: "pattern-remote-access-scam",
+      name: "Remote access scam sessions before high-value transfer",
+      severity: "critical",
+      riskScore: 94,
+      signals: ["remote_access_tool", "new beneficiary", "behaviour deviation", "high-value transfer"],
+      affectedEntities: ["usr_93f6a2c8", "acct_0041", "pay-8GPI-4419"],
+      proposedRuleId: "rule-remote-access-transfer-hold",
+      firstSeenAt: minutesAgo(47),
+      lastSeenAt: minutesAgo(4),
+      impactEstimate: "$1.84M payments held before settlement",
+      status: "contained",
+    },
+    {
+      id: "pattern-agentic-browser-card-testing",
+      name: "Agentic browser automation card testing",
+      severity: "high",
+      riskScore: 86,
+      signals: ["bot_score", "low-value probes", "device fingerprint reuse", "merchant hopping"],
+      affectedEntities: ["mrc-velo-184", "mrc-luno-092", "dev-shared-019"],
+      proposedRuleId: "rule-agentic-browser-card-testing",
+      firstSeenAt: minutesAgo(136),
+      lastSeenAt: minutesAgo(12),
+      impactEstimate: "3,900 low-value probes suppressed",
+      status: "watching",
+    },
+    {
+      id: "pattern-deepfake-onboarding",
+      name: "Deepfake-assisted merchant onboarding cluster",
+      severity: "high",
+      riskScore: 82,
+      signals: ["deepfake_risk", "shared operators", "fresh domains", "no acquiring transactions"],
+      affectedEntities: ["mrc-atlas-771", "mrc-cape-330"],
+      proposedRuleId: "rule-merchant-deepfake-step-up",
+      firstSeenAt: minutesAgo(231),
+      lastSeenAt: minutesAgo(20),
+      impactEstimate: "14 merchant step-up reviews created",
+      status: "escalated",
+    },
+  ],
+  actionQueue: [
+    {
+      id: "act-hold-remote-access-001",
+      agentId: "agent-aml-ops",
+      type: "hold_payment",
+      title: "Hold transfer with remote access scam signals",
+      description:
+        "Payment was initiated after remote access telemetry, impossible travel, and beneficiary change within 8 minutes.",
+      riskScore: 94,
+      amount: 184_000,
+      status: "executed",
+      requiresApproval: false,
+      evidence: ["pattern-remote-access-scam", "pay-8GPI-4419", "case-2048"],
+      createdAt: minutesAgo(6),
+      executedAt: minutesAgo(5),
+      approvedBy: "policy-real-time-fraud-defense",
+    },
+    {
+      id: "act-rule-card-testing-002",
+      agentId: "agent-rule-assistant",
+      type: "propose_rule",
+      title: "Deploy agentic browser card-testing rule",
+      description:
+        "Add a monitor-mode rule for low-value probes, high bot score, and fingerprint reuse across merchants.",
+      riskScore: 86,
+      status: "requires_approval",
+      requiresApproval: true,
+      evidence: ["pattern-agentic-browser-card-testing", "rule-agentic-browser-card-testing"],
+      createdAt: minutesAgo(12),
+    },
+    {
+      id: "act-share-merchant-003",
+      agentId: "agent-graph-analyst",
+      type: "share_intelligence",
+      title: "Share anonymised merchant collusion package",
+      description:
+        "Publish HMAC-only collusion package to trusted institutions for merchants sharing users and device infrastructure.",
+      riskScore: 91,
+      status: "requires_approval",
+      requiresApproval: true,
+      evidence: ["mrc-velo-184", "mrc-luno-092", "dev-shared-019"],
+      createdAt: minutesAgo(17),
+    },
+  ],
+};
+
+export const deploymentReadiness: DeploymentReadiness = {
+  environment: process.env.NODE_ENV ?? "development",
+  generatedAt: minutesAgo(1),
+  status: "warn",
+  checks: [
+    {
+      id: "readiness-api",
+      name: "API health and rate limiting",
+      status: "pass",
+      detail: "NestJS health endpoint, RBAC guard, Helmet, CORS, and throttling are enabled.",
+    },
+    {
+      id: "readiness-secrets",
+      name: "Production secret binding",
+      status: process.env.CONSORTIUM_SHARED_SECRET ? "pass" : "warn",
+      detail: process.env.CONSORTIUM_SHARED_SECRET
+        ? "Consortium HMAC and encryption secret is provided by the environment."
+        : "Local development secret is in use.",
+      remediation: "Set CONSORTIUM_SHARED_SECRET and mount production keys from a vault before launch.",
+    },
+    {
+      id: "readiness-persistence",
+      name: "Durable storage adapters",
+      status: process.env.DATABASE_URL && process.env.REDIS_URL ? "pass" : "warn",
+      detail: process.env.DATABASE_URL && process.env.REDIS_URL
+        ? "PostgreSQL and Redis connection strings are configured."
+        : "The local demo uses in-memory state until DATABASE_URL and REDIS_URL are configured.",
+      remediation: "Run Prisma migrations and connect Redis/Kafka before processing live customer data.",
+    },
+    {
+      id: "readiness-agentops",
+      name: "AgentOps governance",
+      status: "pass",
+      detail: "Agent autonomy modes, approval queues, policy thresholds, telemetry, and audit trails are modeled.",
+    },
+    {
+      id: "readiness-observability",
+      name: "Operational telemetry",
+      status: "pass",
+      detail: "Prometheus-compatible metrics and readiness APIs are exposed for deployment monitoring.",
+    },
+  ],
+};
+
 export const merchantInsights: MerchantRiskInsight[] = [
   {
     merchantId: "mrc-velo-184",
@@ -777,6 +964,7 @@ export const suggestedRules: SuggestedRule[] = [
     action: "review",
     backtestSummary:
       "Backtest across 90 days found 42 merchant events, 31 confirmed risky, and avoided broad review of 1,690 low-risk merchants.",
+    lifecycle: "monitor",
   },
   {
     id: "rule-dormant-session-spike",
@@ -790,6 +978,51 @@ export const suggestedRules: SuggestedRule[] = [
     action: "step_up",
     backtestSummary:
       "Captured 86 percent of dormant-pivot incidents with 18 percent fewer false positives than a flat volume rule.",
+    lifecycle: "monitor",
+  },
+  {
+    id: "rule-remote-access-transfer-hold",
+    name: "Remote access transfer hold",
+    description:
+      "Hold high-value transfers when remote access telemetry appears near a beneficiary change or abnormal session behavior.",
+    logic:
+      "event.type = 'transaction' AND amount > 25000 AND remote_access_tool = true AND beneficiary.changed_within_minutes <= 15 AND behaviour_deviation > 70",
+    expectedFireRate: 0.9,
+    expectedFalsePositiveReduction: 31,
+    action: "hold",
+    backtestSummary:
+      "Captured 92 percent of confirmed remote-access scam transfers while keeping legitimate assisted-service sessions below 0.4 percent review rate.",
+    lifecycle: "active",
+    approvedBy: "policy-real-time-fraud-defense",
+    deployedAt: minutesAgo(5),
+  },
+  {
+    id: "rule-agentic-browser-card-testing",
+    name: "Agentic browser card-testing suppression",
+    description:
+      "Step up or block low-value probing patterns produced by automated browser agents across merchants.",
+    logic:
+      "bot_score > 78 AND device_fingerprint_reuse > 5 AND txn.amount < 5 AND merchant.count_30m > 3",
+    expectedFireRate: 2.1,
+    expectedFalsePositiveReduction: 27,
+    action: "step_up",
+    backtestSummary:
+      "Suppressed 3,900 low-value probes and reduced downstream dispute exposure by 24 percent in simulation.",
+    lifecycle: "draft",
+  },
+  {
+    id: "rule-merchant-deepfake-step-up",
+    name: "Deepfake merchant onboarding step-up",
+    description:
+      "Require enhanced review for new or dormant merchants with deepfake indicators and shared operator infrastructure.",
+    logic:
+      "merchant.age_days < 120 AND deepfake_risk > 65 AND device.distinct_merchant_count > 2 AND acquiring_txn_count = 0",
+    expectedFireRate: 1.4,
+    expectedFalsePositiveReduction: 19,
+    action: "review",
+    backtestSummary:
+      "Identified 14 high-risk merchant onboarding clusters with limited impact on established merchants.",
+    lifecycle: "draft",
   },
 ];
 

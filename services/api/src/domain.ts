@@ -35,12 +35,17 @@ export interface BehaviourSignals {
   velocity_24h?: number;
   device_age_hours?: number;
   device_reputation?: number;
+  device_fingerprint_reuse?: number;
   ip_risk?: number;
   geo_velocity_kmh?: number;
   account_age_days?: number;
   email_risk?: number;
   phone_risk?: number;
   behavior_deviation?: number;
+  bot_score?: number;
+  remote_access_tool?: boolean;
+  deepfake_risk?: number;
+  session_entropy?: number;
   beneficiary_risk?: number;
   graph_risk?: number;
   consortium_hits?: number;
@@ -285,6 +290,112 @@ export interface AgentCapability {
   lastRunAt: string;
 }
 
+export type AgentAutonomyMode = "copilot" | "monitored" | "autonomous";
+export type AgentActionType =
+  | "create_case"
+  | "hold_payment"
+  | "block_transaction"
+  | "step_up"
+  | "propose_rule"
+  | "share_intelligence"
+  | "draft_sar";
+export type AgentActionStatus = "queued" | "requires_approval" | "approved" | "executed" | "rejected";
+export type ReadinessStatus = "pass" | "warn" | "fail";
+
+export interface AgentOpsPolicy {
+  id: string;
+  name: string;
+  autonomyMode: AgentAutonomyMode;
+  riskThreshold: number;
+  humanApprovalAboveRisk: number;
+  maxAutonomousValue: number;
+  allowedActions: AgentActionType[];
+  escalationRoles: UserRole[];
+  description: string;
+}
+
+export interface AgentAction {
+  id: string;
+  agentId: string;
+  type: AgentActionType;
+  title: string;
+  description: string;
+  riskScore: number;
+  amount?: number;
+  status: AgentActionStatus;
+  requiresApproval: boolean;
+  evidence: string[];
+  createdAt: string;
+  executedAt?: string;
+  approvedBy?: string;
+}
+
+export interface AgentTelemetry {
+  signalsMonitoredDaily: number;
+  lastCycleAt: string;
+  p95LatencyMs: number;
+  agentPrecision: number;
+  falsePositiveReduction: number;
+  driftScore: number;
+  queuedActions: number;
+  autonomousActionsToday: number;
+  humanApprovalsPending: number;
+  casesCreatedToday: number;
+  paymentValueHeld: number;
+  rulesProposedToday: number;
+}
+
+export interface EmergingPattern {
+  id: string;
+  name: string;
+  severity: RiskLevel;
+  riskScore: number;
+  signals: string[];
+  affectedEntities: string[];
+  proposedRuleId?: string;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  impactEstimate: string;
+  status: "watching" | "contained" | "escalated";
+}
+
+export interface AgentExecutionStep {
+  id: string;
+  name: string;
+  status: "completed" | "waiting_approval" | "skipped";
+  evidenceRef: string;
+}
+
+export interface AgentPolicyDecision {
+  autonomyMode: AgentAutonomyMode;
+  allowedToExecute: boolean;
+  approvalRequired: boolean;
+  reason: string;
+}
+
+export interface AgentOpsControlPlane {
+  autonomyMode: AgentAutonomyMode;
+  policies: AgentOpsPolicy[];
+  actionQueue: AgentAction[];
+  telemetry: AgentTelemetry;
+  emergingPatterns: EmergingPattern[];
+}
+
+export interface DeploymentReadinessCheck {
+  id: string;
+  name: string;
+  status: ReadinessStatus;
+  detail: string;
+  remediation?: string;
+}
+
+export interface DeploymentReadiness {
+  environment: string;
+  status: ReadinessStatus;
+  generatedAt: string;
+  checks: DeploymentReadinessCheck[];
+}
+
 export interface AgentRunResult {
   id: string;
   agentId: string;
@@ -297,6 +408,9 @@ export interface AgentRunResult {
   recommendedActions: string[];
   generatedRule?: SuggestedRule;
   evidencePackageId?: string;
+  executionPlan?: AgentExecutionStep[];
+  actionsQueued?: string[];
+  policyDecision?: AgentPolicyDecision;
 }
 
 export interface MerchantRiskInsight {
@@ -395,6 +509,9 @@ export interface SuggestedRule {
   expectedFalsePositiveReduction: number;
   action: "review" | "block" | "step_up" | "hold";
   backtestSummary: string;
+  lifecycle?: "draft" | "monitor" | "active" | "retired";
+  approvedBy?: string;
+  deployedAt?: string;
 }
 
 export interface WorkforceImpact {
@@ -457,6 +574,8 @@ export interface DemoVideo {
 export interface AgenticOperations {
   agents: AgentCapability[];
   recentRuns: AgentRunResult[];
+  controlPlane: AgentOpsControlPlane;
+  deploymentReadiness: DeploymentReadiness;
   merchantInsights: MerchantRiskInsight[];
   sharedDevices: SharedDeviceInsight[];
   accountTakeovers: AccountTakeoverInsight[];

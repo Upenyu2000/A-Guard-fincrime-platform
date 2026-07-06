@@ -74,6 +74,20 @@ function timeAgo(value: string) {
   return `${Math.floor(minutes / 60)}h`;
 }
 
+function RelativeTime({ value, suffix = "" }: { value: string; suffix?: string }) {
+  const [mounted, setMounted] = useState(false);
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    setMounted(true);
+    const interval = window.setInterval(() => setTick((current) => current + 1), 30_000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  if (!mounted) return <>...</>;
+  return <>{timeAgo(value)}{suffix}</>;
+}
+
 export function OperatingConsole() {
   const queryClient = useQueryClient();
   const { picture, connected, setPicture, setConnected, pushAlert, setLastDecisionScore, lastDecisionScore } =
@@ -433,7 +447,7 @@ function AlertRow({ alert }: { alert: Alert }) {
           <div className="flex flex-wrap items-center gap-2">
             <span className={`h-2 w-2 rounded-full ${riskDot[alert.severity]}`} />
             <span className="text-xs uppercase tracking-[0.12em] text-white/45">{alert.institution}</span>
-            <span className="text-xs text-white/35">{timeAgo(alert.createdAt)}</span>
+            <span className="text-xs text-white/35"><RelativeTime value={alert.createdAt} /></span>
           </div>
           <h3 className="mt-1 line-clamp-2 text-sm font-medium text-white">{alert.title}</h3>
         </div>
@@ -533,7 +547,7 @@ function PaymentRoute({ payment }: { payment: Payment }) {
             <div className="min-w-0 pb-2">
               <p className="truncate text-sm text-white">{hop.institution}</p>
               <p className="text-xs text-white/45">
-                {hop.country} / {timeAgo(hop.timestamp)}
+                {hop.country} / <RelativeTime value={hop.timestamp} />
               </p>
             </div>
             <div className="text-right text-xs text-white/65">{hop.risk}</div>
@@ -853,7 +867,7 @@ function LearningSystem({ picture }: { picture: OperatingPicture }) {
         <div className="rounded-lg border border-white/10 bg-white/[0.035] p-3">
           <p className="text-xs uppercase tracking-[0.14em] text-white/35">Model</p>
           <p className="mt-2 text-sm font-medium text-white">{picture.learning.modelVersion}</p>
-          <p className="mt-2 text-xs text-white/45">Retrained {timeAgo(picture.learning.lastRetrainedAt)} ago</p>
+          <p className="mt-2 text-xs text-white/45">Retrained <RelativeTime value={picture.learning.lastRetrainedAt} suffix=" ago" /></p>
         </div>
         <div className="rounded-lg border border-white/10 bg-white/[0.035] p-3">
           <p className="text-xs uppercase tracking-[0.14em] text-white/35">Drift index</p>
@@ -888,7 +902,7 @@ function AuditPanel({ picture }: { picture: OperatingPicture }) {
           <div key={event.id} className="rounded-lg border border-white/10 bg-white/[0.035] p-3">
             <div className="flex items-center justify-between gap-2">
               <p className="truncate text-sm text-white">{event.action}</p>
-              <span className="text-xs text-white/38">{timeAgo(event.createdAt)}</span>
+              <span className="text-xs text-white/38"><RelativeTime value={event.createdAt} /></span>
             </div>
             <p className="mt-1 truncate text-xs text-white/45">
               {event.actor} / {event.target}

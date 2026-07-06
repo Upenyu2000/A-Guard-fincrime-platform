@@ -1,5 +1,5 @@
 import { fallbackPicture } from "./fallback";
-import { AgentRunResult, OperatingPicture, OsintFinding, RiskDecision } from "./types";
+import { AgentAction, AgentAutonomyMode, AgentOpsControlPlane, AgentRunResult, DeploymentReadiness, OperatingPicture, OsintFinding, RiskDecision } from "./types";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 export const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? "http://localhost:4000";
@@ -53,12 +53,17 @@ export async function scoreSyntheticEvent(): Promise<RiskDecision> {
         velocity_24h: 22,
         device_age_hours: 1.4,
         device_reputation: 83,
+        device_fingerprint_reuse: 9,
         ip_risk: 77,
         geo_velocity_kmh: 1200,
         account_age_days: 8,
         email_risk: 71,
         phone_risk: 64,
         behavior_deviation: 88,
+        bot_score: 82,
+        remote_access_tool: true,
+        deepfake_risk: 52,
+        session_entropy: 22,
         beneficiary_risk: 84,
         graph_risk: 81,
         consortium_hits: 2,
@@ -127,4 +132,52 @@ export async function osintSearch(entityName: string): Promise<OsintFinding> {
   });
   if (!response.ok) throw new Error(`OSINT search failed with ${response.status}`);
   return response.json() as Promise<OsintFinding>;
+}
+
+export async function runAgentOpsCycle(): Promise<{ run: AgentRunResult; action: AgentAction; controlPlane: AgentOpsControlPlane }> {
+  const response = await fetch(`${API_URL}/v1/agentops/run-cycle`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-role": "fraud_investigator",
+      "x-actor": "console.user",
+    },
+  });
+  if (!response.ok) throw new Error(`AgentOps cycle failed with ${response.status}`);
+  return response.json() as Promise<{ run: AgentRunResult; action: AgentAction; controlPlane: AgentOpsControlPlane }>;
+}
+
+export async function approveAgentAction(id: string): Promise<{ action: AgentAction; controlPlane: AgentOpsControlPlane }> {
+  const response = await fetch(`${API_URL}/v1/agentops/actions/${id}/approve`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-role": "fraud_investigator",
+      "x-actor": "console.user",
+    },
+  });
+  if (!response.ok) throw new Error(`Agent action approval failed with ${response.status}`);
+  return response.json() as Promise<{ action: AgentAction; controlPlane: AgentOpsControlPlane }>;
+}
+
+export async function setAgentAutonomy(mode: AgentAutonomyMode): Promise<AgentOpsControlPlane> {
+  const response = await fetch(`${API_URL}/v1/agentops/autonomy`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-role": "admin",
+      "x-actor": "console.admin",
+    },
+    body: JSON.stringify({ mode }),
+  });
+  if (!response.ok) throw new Error(`Autonomy update failed with ${response.status}`);
+  return response.json() as Promise<AgentOpsControlPlane>;
+}
+
+export async function fetchDeploymentReadiness(): Promise<DeploymentReadiness> {
+  const response = await fetch(`${API_URL}/v1/deployment/readiness`, {
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error(`Readiness check failed with ${response.status}`);
+  return response.json() as Promise<DeploymentReadiness>;
 }

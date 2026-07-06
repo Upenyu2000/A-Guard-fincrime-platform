@@ -16,6 +16,19 @@ The platform simulates the production flow:
 3. Critical events publish live alerts over WebSockets and can auto-create investigation cases.
 4. The identity graph, payment route, collaboration network, AML convergence, and AI copilot views update from the same operating picture.
 
+## Production Operations
+
+The current app includes deployment-grade control surfaces that can be backed by live infrastructure:
+
+- AgentOps control plane with copilot, monitored, and autonomous modes.
+- Human approval queue for high-risk agent actions and rule deployment.
+- Real-time defense cycle endpoint for emerging pattern detection and rule proposal.
+- Prometheus-compatible `/v1/metrics` endpoint.
+- `/v1/deployment/readiness` launch-gate checks for secrets, persistence, AgentOps, and observability.
+- Extended fraud signals for remote-access scams, bot or agentic browser automation, persistent fingerprint reuse, deepfake risk, and session entropy.
+
+Before processing real customer data, configure production secrets from a vault, run Prisma migrations against PostgreSQL, connect Redis/Kafka/Neo4j, enable authenticated JWT claims in place of local `x-role` headers, and connect approved OSINT, dispute, and payment-rail providers.
+
 ## Local Development
 
 ```bash

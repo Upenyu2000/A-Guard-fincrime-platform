@@ -95,6 +95,42 @@ export class FraudEngineService {
       });
     }
 
+    if (n(signals.device_fingerprint_reuse) >= 5) {
+      hits.push({
+        reason: "persistent device fingerprint reuse",
+        score: 18,
+        feature: "device_fingerprint_reuse",
+        evidence: `Device fingerprint reused by ${n(signals.device_fingerprint_reuse)} accounts.`,
+      });
+    }
+
+    if (n(signals.bot_score) >= 75 || n(signals.session_entropy, 100) <= 28) {
+      hits.push({
+        reason: "agentic browser or bot automation",
+        score: 20,
+        feature: "bot_automation",
+        evidence: `Bot score ${n(signals.bot_score)}, session entropy ${n(signals.session_entropy, 100)}.`,
+      });
+    }
+
+    if (signals.remote_access_tool) {
+      hits.push({
+        reason: "remote access scam signal",
+        score: 24,
+        feature: "remote_access_tool",
+        evidence: "Remote access tooling detected in the session before a sensitive action.",
+      });
+    }
+
+    if (n(signals.deepfake_risk) >= 65) {
+      hits.push({
+        reason: "deepfake or synthetic media risk",
+        score: 21,
+        feature: "deepfake_risk",
+        evidence: `Deepfake risk ${n(signals.deepfake_risk)}.`,
+      });
+    }
+
     if (n(signals.geo_velocity_kmh) >= 700) {
       hits.push({
         reason: "geo-velocity anomaly",
@@ -160,6 +196,9 @@ export class FraudEngineService {
       n(s.phone_risk) * 0.12 +
       n(s.device_reputation) * 0.19 +
       n(s.behavior_deviation) * 0.22 +
+      n(s.bot_score) * 0.09 +
+      n(s.deepfake_risk) * 0.08 +
+      (s.remote_access_tool ? 15 : 0) +
       (n(s.account_age_days, 365) < 14 ? 12 : 0);
     return Math.round(clamp(digitalIdentity));
   }

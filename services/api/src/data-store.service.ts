@@ -1,9 +1,12 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import {
   Alert,
+  AgentAction,
   AgentCapability,
+  AgentAutonomyMode,
   AgentRunResult,
+  AgentOpsControlPlane,
   AgenticOperations,
   AmlCustomerRisk,
   AuditEvent,
@@ -32,16 +35,19 @@ import {
   WorkforceImpact,
   AccountTakeoverInsight,
   DemoVideo,
+  DeploymentReadiness,
   eventTypes,
 } from "./domain";
 import {
   accountTakeovers as seedAccountTakeovers,
   agentCapabilities as seedAgentCapabilities,
+  agentOpsControlPlane as seedAgentOpsControlPlane,
   alerts as seedAlerts,
   amlCustomers as seedAmlCustomers,
   audit as seedAudit,
   cases as seedCases,
   demoVideo as seedDemoVideo,
+  deploymentReadiness as seedDeploymentReadiness,
   disputes as seedDisputes,
   facilitatedTraining as seedFacilitatedTraining,
   graphEdges as seedGraphEdges,
@@ -83,6 +89,8 @@ export class DataStoreService {
   private readonly learning: LearningState = structuredClone(seedLearning);
   private readonly agents: AgentCapability[] = structuredClone(seedAgentCapabilities);
   private readonly recentAgentRuns: AgentRunResult[] = structuredClone(seedRecentAgentRuns);
+  private readonly controlPlane: AgentOpsControlPlane = structuredClone(seedAgentOpsControlPlane);
+  private readonly deploymentReadinessSeed: DeploymentReadiness = structuredClone(seedDeploymentReadiness);
   private readonly merchantInsights: MerchantRiskInsight[] = structuredClone(seedMerchantInsights);
   private readonly sharedDevices: SharedDeviceInsight[] = structuredClone(seedSharedDeviceInsights);
   private readonly accountTakeovers: AccountTakeoverInsight[] = structuredClone(seedAccountTakeovers);
@@ -122,6 +130,8 @@ export class DataStoreService {
     return {
       agents: this.agents,
       recentRuns: this.recentAgentRuns.slice(0, 8),
+      controlPlane: this.controlPlaneSnapshot(),
+      deploymentReadiness: this.deploymentReadiness(),
       merchantInsights: this.merchantInsights,
       sharedDevices: this.sharedDevices.slice(0, 10),
       accountTakeovers: this.accountTakeovers,
@@ -143,6 +153,7 @@ export class DataStoreService {
     const evidencePackageId = normalized.includes("dispute") || normalized.includes("visa")
       ? "ce30-package-disp-visa-3001"
       : undefined;
+    const action = this.actionForPrompt(agent.id, normalized);
     const result: AgentRunResult = {
       id: `run-${randomUUID().slice(0, 8)}`,
       agentId: agent.id,
@@ -155,7 +166,16 @@ export class DataStoreService {
       recommendedActions: this.agentActions(normalized),
       generatedRule,
       evidencePackageId,
+      executionPlan: this.executionPlanFor(this.planKindFor(normalized)),
+      actionsQueued: action ? [action.id] : [],
+      policyDecision: this.policyDecisionFor(action?.riskScore ?? this.confidenceForPrompt(normalized), action?.amount),
     };
+
+    if (action) {
+      this.controlPlane.actionQueue.unshift(action);
+      this.controlPlane.telemetry.queuedActions += 1;
+      if (action.requiresApproval) this.controlPlane.telemetry.humanApprovalsPending += 1;
+    }
 
     agent.lastRunAt = result.completedAt;
     agent.status = result.status;
@@ -202,6 +222,216 @@ export class DataStoreService {
       facilitatedTraining: this.facilitatedTraining,
       workforceImpact: this.workforceImpact,
     };
+  }
+
+  agentOpsControlPlane() {
+    return {
+      controlPlane: this.controlPlaneSnapshot(),
+      deploymentReadiness: this.deploymentReadiness(),
+    };
+  }
+
+  runAgenticDefenseCycle(actor: string, role: UserRole) {
+    const cycleId = `cycle-${randomUUID().slice(0, 8)}`;
+    const pattern = this.controlPlane.emergingPatterns.find((item) => item.id === "pattern-agentic-browser-card-testing");
+    if (pattern) {
+      pattern.lastSeenAt = nowIso();
+      pattern.status = "watching";
+    }
+
+    const action: AgentAction = {
+      id: `act-rule-${randomUUID().slice(0, 8)}`,
+      agentId: "agent-rule-assistant",
+      type: "propose_rule",
+      title: "Promote agentic browser card-testing control",
+      description:
+        "The defense cycle observed low-value probes, high bot score, shared fingerprints, and merchant hopping. Deploy the rule in monitor mode before enforcement.",
+      riskScore: 86,
+      status: this.controlPlane.autonomyMode === "autonomous" ? "approved" : "requires_approval",
+      requiresApproval: this.controlPlane.autonomyMode !== "autonomous",
+      evidence: ["pattern-agentic-browser-card-testing", "rule-agentic-browser-card-testing"],
+      createdAt: nowIso(),
+      executedAt: this.controlPlane.autonomyMode === "autonomous" ? nowIso() : undefined,
+      approvedBy: this.controlPlane.autonomyMode === "autonomous" ? "policy-real-time-fraud-defense" : undefined,
+    };
+
+    this.controlPlane.actionQueue.unshift(action);
+    this.controlPlane.telemetry.lastCycleAt = nowIso();
+    this.controlPlane.telemetry.rulesProposedToday += 1;
+    this.controlPlane.telemetry.queuedActions = this.controlPlane.actionQueue.filter(
+      (item) => item.status === "queued" || item.status === "requires_approval",
+    ).length;
+    this.controlPlane.telemetry.humanApprovalsPending = this.controlPlane.actionQueue.filter(
+      (item) => item.requiresApproval && item.status === "requires_approval",
+    ).length;
+    if (action.status === "approved") {
+      this.controlPlane.telemetry.autonomousActionsToday += 1;
+    }
+
+    const run: AgentRunResult = {
+      id: `run-${randomUUID().slice(0, 8)}`,
+      agentId: "agent-rule-assistant",
+      prompt: "Autonomous defense cycle: detect emerging browser-agent card testing and propose controls.",
+      status: action.requiresApproval ? "needs_review" : "ready",
+      confidence: 88,
+      completedAt: nowIso(),
+      summary:
+        "The defense cycle found renewed browser-agent card-testing behavior and queued a rule promotion with evidence.",
+      findings: [
+        "Low-value probes are occurring across Velo Digital Goods and Luno Arcade.",
+        "Device fingerprints are reused across more than five accounts and three merchants.",
+        "Bot scores exceed 78 while session entropy remains below human baselines.",
+      ],
+      recommendedActions: [
+        "Approve monitor-mode deployment for rule-agentic-browser-card-testing.",
+        "Keep settlement holds enabled for merchants with collusion score above 85.",
+        "Review the action queue before raising enforcement from step-up to block.",
+      ],
+      generatedRule: this.suggestedRules.find((item) => item.id === "rule-agentic-browser-card-testing"),
+      actionsQueued: [action.id],
+      executionPlan: this.executionPlanFor("rule"),
+      policyDecision: this.policyDecisionFor(action.riskScore, action.amount),
+    };
+
+    this.recentAgentRuns.unshift(run);
+    this.audit.unshift(
+      this.security.audit(actor, role, "agentops.defense_cycle.completed", cycleId, {
+        actionId: action.id,
+        autonomyMode: this.controlPlane.autonomyMode,
+        approvalRequired: action.requiresApproval,
+      }),
+    );
+
+    return {
+      cycleId,
+      run,
+      action,
+      controlPlane: this.controlPlaneSnapshot(),
+    };
+  }
+
+  approveAgentAction(id: string, actor: string, role: UserRole) {
+    const action = this.controlPlane.actionQueue.find((item) => item.id === id);
+    if (!action) throw new NotFoundException(`Agent action ${id} was not found.`);
+
+    action.status = "executed";
+    action.requiresApproval = false;
+    action.approvedBy = actor;
+    action.executedAt = nowIso();
+
+    const ruleId = action.evidence.find((item) => item.startsWith("rule-"));
+    if (ruleId) {
+      const rule = this.suggestedRules.find((item) => item.id === ruleId);
+      if (rule) {
+        rule.lifecycle = rule.lifecycle === "draft" ? "monitor" : "active";
+        rule.approvedBy = actor;
+        rule.deployedAt = nowIso();
+      }
+    }
+
+    this.controlPlane.telemetry.autonomousActionsToday += 1;
+    this.controlPlane.telemetry.humanApprovalsPending = this.controlPlane.actionQueue.filter(
+      (item) => item.requiresApproval && item.status === "requires_approval",
+    ).length;
+    this.controlPlane.telemetry.queuedActions = this.controlPlane.actionQueue.filter(
+      (item) => item.status === "queued" || item.status === "requires_approval",
+    ).length;
+
+    this.audit.unshift(
+      this.security.audit(actor, role, "agentops.action.approved", id, {
+        actionType: action.type,
+        riskScore: action.riskScore,
+      }),
+    );
+
+    return {
+      action,
+      controlPlane: this.controlPlaneSnapshot(),
+    };
+  }
+
+  setAutonomyMode(mode: AgentAutonomyMode, actor: string, role: UserRole) {
+    if (!["copilot", "monitored", "autonomous"].includes(mode)) {
+      throw new BadRequestException("Autonomy mode must be copilot, monitored, or autonomous.");
+    }
+
+    this.controlPlane.autonomyMode = mode;
+    this.controlPlane.policies = this.controlPlane.policies.map((policy) => ({
+      ...policy,
+      autonomyMode: policy.id === "policy-dispute-evidence" ? policy.autonomyMode : mode,
+    }));
+
+    this.audit.unshift(
+      this.security.audit(actor, role, "agentops.autonomy.updated", "agentops-control-plane", {
+        mode,
+      }),
+    );
+
+    return this.controlPlaneSnapshot();
+  }
+
+  deploymentReadiness(): DeploymentReadiness {
+    const checks = this.deploymentReadinessSeed.checks.map((check) => {
+      if (check.id === "readiness-secrets") {
+        const configured = Boolean(process.env.CONSORTIUM_SHARED_SECRET);
+        return {
+          ...check,
+          status: configured ? "pass" as const : "warn" as const,
+          detail: configured
+            ? "Consortium HMAC and encryption secret is provided by the environment."
+            : "Local development secret is in use.",
+        };
+      }
+
+      if (check.id === "readiness-persistence") {
+        const configured = Boolean(process.env.DATABASE_URL && process.env.REDIS_URL);
+        return {
+          ...check,
+          status: configured ? "pass" as const : "warn" as const,
+          detail: configured
+            ? "PostgreSQL and Redis connection strings are configured."
+            : "The local demo uses in-memory state until DATABASE_URL and REDIS_URL are configured.",
+        };
+      }
+
+      return check;
+    });
+
+    const status: DeploymentReadiness["status"] = checks.some((check) => check.status === "fail")
+      ? "fail"
+      : checks.some((check) => check.status === "warn")
+        ? "warn"
+        : "pass";
+
+    return {
+      ...this.deploymentReadinessSeed,
+      environment: process.env.NODE_ENV ?? "development",
+      generatedAt: nowIso(),
+      status,
+      checks,
+    };
+  }
+
+  prometheusMetrics() {
+    const telemetry = this.controlPlane.telemetry;
+    return [
+      "# HELP african_guard_decision_latency_ms Decision latency in milliseconds.",
+      "# TYPE african_guard_decision_latency_ms gauge",
+      `african_guard_decision_latency_ms ${this.metrics.decisionLatencyMs}`,
+      "# HELP african_guard_agent_p95_latency_ms Agent p95 latency in milliseconds.",
+      "# TYPE african_guard_agent_p95_latency_ms gauge",
+      `african_guard_agent_p95_latency_ms ${telemetry.p95LatencyMs}`,
+      "# HELP african_guard_agent_pending_approvals Pending agent approvals.",
+      "# TYPE african_guard_agent_pending_approvals gauge",
+      `african_guard_agent_pending_approvals ${telemetry.humanApprovalsPending}`,
+      "# HELP african_guard_payment_value_held Payment value held by automated controls.",
+      "# TYPE african_guard_payment_value_held gauge",
+      `african_guard_payment_value_held ${telemetry.paymentValueHeld}`,
+      "# HELP african_guard_model_drift_score Model and agent drift score.",
+      "# TYPE african_guard_model_drift_score gauge",
+      `african_guard_model_drift_score ${Math.max(this.learning.driftIndex, telemetry.driftScore)}`,
+      "",
+    ].join("\n");
   }
 
   ingestEvent(event: FraudEventInput, decision: RiskDecision) {
@@ -435,12 +665,17 @@ export class DataStoreService {
         velocity_24h: criticalBias ? 18 + Math.round(Math.random() * 12) : 3 + Math.round(Math.random() * 12),
         device_age_hours: criticalBias ? Math.random() * 3 : 12 + Math.random() * 200,
         device_reputation: criticalBias ? 62 + Math.random() * 34 : 8 + Math.random() * 45,
+        device_fingerprint_reuse: criticalBias ? 5 + Math.round(Math.random() * 9) : Math.round(Math.random() * 4),
         ip_risk: criticalBias ? 68 + Math.random() * 24 : 10 + Math.random() * 42,
         geo_velocity_kmh: criticalBias ? 820 + Math.random() * 1600 : Math.random() * 420,
         account_age_days: criticalBias ? Math.round(Math.random() * 11) : 40 + Math.round(Math.random() * 1200),
         email_risk: criticalBias ? 67 + Math.random() * 27 : Math.random() * 41,
         phone_risk: criticalBias ? 54 + Math.random() * 32 : Math.random() * 38,
         behavior_deviation: criticalBias ? 72 + Math.random() * 22 : 8 + Math.random() * 39,
+        bot_score: criticalBias ? 70 + Math.random() * 25 : 4 + Math.random() * 38,
+        remote_access_tool: criticalBias && Math.random() > 0.68,
+        deepfake_risk: criticalBias ? 38 + Math.random() * 42 : Math.random() * 28,
+        session_entropy: criticalBias ? 16 + Math.random() * 30 : 45 + Math.random() * 45,
         beneficiary_risk: criticalBias ? 76 + Math.random() * 20 : 8 + Math.random() * 45,
         graph_risk: criticalBias ? 70 + Math.random() * 25 : 12 + Math.random() * 44,
         consortium_hits: criticalBias ? 1 + Math.round(Math.random() * 3) : Math.random() > 0.92 ? 1 : 0,
@@ -451,6 +686,169 @@ export class DataStoreService {
         failed_logins_10m: eventType === "login" && criticalBias ? 4 + Math.round(Math.random() * 6) : 0,
       },
     };
+  }
+
+  private controlPlaneSnapshot(): AgentOpsControlPlane {
+    const actionQueue = this.controlPlane.actionQueue.slice(0, 10);
+    return {
+      ...this.controlPlane,
+      actionQueue,
+      telemetry: {
+        ...this.controlPlane.telemetry,
+        queuedActions: this.controlPlane.actionQueue.filter(
+          (item) => item.status === "queued" || item.status === "requires_approval",
+        ).length,
+        humanApprovalsPending: this.controlPlane.actionQueue.filter(
+          (item) => item.requiresApproval && item.status === "requires_approval",
+        ).length,
+      },
+      emergingPatterns: this.controlPlane.emergingPatterns.slice(0, 8),
+    };
+  }
+
+  private executionPlanFor(kind: "rule" | "dispute" | "osint" | "graph" | "ato" | "general") {
+    const plans = {
+      rule: [
+        ["collect-pattern", "Collect linked event and session pattern", "pattern-agentic-browser-card-testing"],
+        ["backtest-rule", "Backtest rule against recent traffic", "rule-agentic-browser-card-testing"],
+        ["queue-approval", "Queue deployment decision for policy approval", "act-rule-card-testing-002"],
+      ],
+      dispute: [
+        ["fetch-history", "Fetch historical undisputed transactions", "disp-visa-3001"],
+        ["match-evidence", "Match device, IP, login, and delivery evidence", "ce30-package-disp-visa-3001"],
+        ["package-review", "Assemble network-ready evidence package", "case-dispute-review"],
+      ],
+      osint: [
+        ["registry-search", "Search registry and ownership records", "osint-registry"],
+        ["adverse-media", "Review adverse media and domain intelligence", "osint-media"],
+        ["edd-summary", "Create EDD-ready risk summary", "edd-summary"],
+      ],
+      graph: [
+        ["resolve-entities", "Resolve shared users, merchants, devices, and IPs", "identity-graph"],
+        ["rank-links", "Rank network links by risk propagation", "graph-risk"],
+        ["containment", "Queue containment or intelligence sharing action", "consortium-package"],
+      ],
+      ato: [
+        ["session-review", "Review last 30 days of login and session activity", "ato-session-window"],
+        ["device-diff", "Compare device and geography changes", "ato-device-diff"],
+        ["containment", "Queue session revoke and reverification action", "ato-containment"],
+      ],
+      general: [
+        ["retrieve-context", "Retrieve case, graph, payment, and consortium context", "operating-picture"],
+        ["score-hypothesis", "Score hypothesis against risk policy", "risk-policy"],
+        ["recommend-action", "Recommend governed next action", "agent-policy"],
+      ],
+    } satisfies Record<string, Array<[string, string, string]>>;
+
+    return plans[kind].map(([id, name, evidenceRef], index) => ({
+      id,
+      name,
+      status: index === plans[kind].length - 1 && this.controlPlane.autonomyMode !== "autonomous"
+        ? "waiting_approval" as const
+        : "completed" as const,
+      evidenceRef,
+    }));
+  }
+
+  private policyDecisionFor(riskScore: number, amount?: number) {
+    const policy = this.controlPlane.policies[0]!;
+    const value = amount ?? 0;
+    const approvalRequired =
+      this.controlPlane.autonomyMode !== "autonomous" ||
+      riskScore >= policy.humanApprovalAboveRisk ||
+      value > policy.maxAutonomousValue;
+
+    return {
+      autonomyMode: this.controlPlane.autonomyMode,
+      allowedToExecute: !approvalRequired,
+      approvalRequired,
+      reason: approvalRequired
+        ? `Human approval required by ${policy.name}: mode ${this.controlPlane.autonomyMode}, risk ${riskScore}, value ${value}.`
+        : `Action is within ${policy.name} autonomous threshold.`,
+    };
+  }
+
+  private planKindFor(prompt: string): "rule" | "dispute" | "osint" | "graph" | "ato" | "general" {
+    if (prompt.includes("rule")) return "rule";
+    if (prompt.includes("dispute") || prompt.includes("visa") || prompt.includes("compelling")) return "dispute";
+    if (prompt.includes("osint")) return "osint";
+    if (prompt.includes("device") || prompt.includes("graph") || prompt.includes("collusion")) return "graph";
+    if (prompt.includes("account takeover")) return "ato";
+    return "general";
+  }
+
+  private actionForPrompt(agentId: string, prompt: string): AgentAction | undefined {
+    if (prompt.includes("rule")) {
+      const riskScore = 86;
+      return {
+        id: `act-rule-${randomUUID().slice(0, 8)}`,
+        agentId,
+        type: "propose_rule",
+        title: "Review generated monitoring rule",
+        description:
+          "A natural-language rule was converted into deployable logic and is queued for backtest and approval.",
+        riskScore,
+        status: this.policyDecisionFor(riskScore).approvalRequired ? "requires_approval" : "approved",
+        requiresApproval: this.policyDecisionFor(riskScore).approvalRequired,
+        evidence: ["rule-new-merchant-reused-device", "merchant-risk-backtest"],
+        createdAt: nowIso(),
+      };
+    }
+
+    if (prompt.includes("account takeover")) {
+      const riskScore = 88;
+      return {
+        id: `act-ato-${randomUUID().slice(0, 8)}`,
+        agentId,
+        type: "step_up",
+        title: "Require reverification for high-risk ATO candidates",
+        description:
+          "Three accounts show impossible travel, new device, payout changes, and session behavior inconsistent with baseline.",
+        riskScore,
+        status: "requires_approval",
+        requiresApproval: true,
+        evidence: this.accountTakeovers.slice(0, 3).map((item) => item.accountId),
+        createdAt: nowIso(),
+      };
+    }
+
+    if (prompt.includes("collusion") || prompt.includes("shared users")) {
+      const riskScore = 91;
+      return {
+        id: `act-share-${randomUUID().slice(0, 8)}`,
+        agentId,
+        type: "share_intelligence",
+        title: "Share anonymised collusion intelligence",
+        description:
+          "High shared-user concentration and merchant-device reuse indicate coordinated abuse across trusted partners.",
+        riskScore,
+        status: "requires_approval",
+        requiresApproval: true,
+        evidence: this.merchantInsights.slice(0, 3).map((item) => item.merchantId),
+        createdAt: nowIso(),
+      };
+    }
+
+    if (prompt.includes("dispute") || prompt.includes("visa") || prompt.includes("compelling")) {
+      const riskScore = 68;
+      return {
+        id: `act-dispute-${randomUUID().slice(0, 8)}`,
+        agentId,
+        type: "draft_sar",
+        title: "Assemble dispute evidence package",
+        description:
+          "Qualifying Visa CE 3.0 evidence was gathered and prepared for human filing workflow.",
+        riskScore,
+        status: "approved",
+        requiresApproval: false,
+        evidence: ["ce30-package-disp-visa-3001"],
+        createdAt: nowIso(),
+        executedAt: nowIso(),
+        approvedBy: "policy-dispute-evidence",
+      };
+    }
+
+    return undefined;
   }
 
   private selectAgent(agentId: string | undefined, prompt: string): AgentCapability {

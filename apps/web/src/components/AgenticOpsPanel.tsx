@@ -3,10 +3,13 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
+  Activity,
   BookOpenCheck,
   Bot,
   Building2,
+  CheckCircle2,
   CirclePlay,
+  Gauge,
   GraduationCap,
   Network,
   Radar,
@@ -19,8 +22,8 @@ import {
   UsersRound,
   Workflow,
 } from "lucide-react";
-import { runAgent } from "@/lib/api";
-import { AgentCapability, AgentRunResult, OperatingPicture, RiskLevel } from "@/lib/types";
+import { approveAgentAction, runAgent, runAgentOpsCycle, setAgentAutonomy } from "@/lib/api";
+import { AgentAutonomyMode, AgentCapability, AgentRunResult, OperatingPicture, RiskLevel } from "@/lib/types";
 
 const money = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -83,6 +86,7 @@ export function AgenticOpsPanel({ picture }: { picture: OperatingPicture }) {
       </div>
 
       <WorkforceImpact picture={picture} />
+      <AgentOpsControlPanel picture={picture} onAgentRun={setLastRun} />
 
       <div className="mt-4 grid gap-4 2xl:grid-cols-[minmax(0,0.78fr)_minmax(420px,0.52fr)]">
         <div className="min-w-0 space-y-4">
@@ -125,6 +129,154 @@ function WorkforceImpact({ picture }: { picture: OperatingPicture }) {
           <p className="mt-2 text-sm text-white/50">{card.detail}</p>
         </div>
       ))}
+    </div>
+  );
+}
+
+function AgentOpsControlPanel({
+  picture,
+  onAgentRun,
+}: {
+  picture: OperatingPicture;
+  onAgentRun: (run: AgentRunResult) => void;
+}) {
+  const queryClient = useQueryClient();
+  const controlPlane = picture.agenticOperations.controlPlane;
+  const readiness = picture.agenticOperations.deploymentReadiness;
+  const nextApproval = controlPlane.actionQueue.find((action) => action.status === "requires_approval");
+  const runCycle = useMutation({
+    mutationFn: runAgentOpsCycle,
+    onSuccess: (result) => {
+      onAgentRun(result.run);
+      void queryClient.invalidateQueries({ queryKey: ["operating-picture"] });
+    },
+  });
+  const approveAction = useMutation({
+    mutationFn: (id: string) => approveAgentAction(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["operating-picture"] });
+    },
+  });
+  const autonomy = useMutation({
+    mutationFn: (mode: AgentAutonomyMode) => setAgentAutonomy(mode),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["operating-picture"] });
+    },
+  });
+
+  return (
+    <div className="mt-4 grid gap-4 2xl:grid-cols-[minmax(0,0.62fr)_minmax(360px,0.38fr)]">
+      <div className="panel p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="mb-3 flex min-w-0 items-center gap-3">
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/[0.06]">
+              <Gauge className="h-4 w-4 text-fuchsia-200" aria-hidden />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[11px] uppercase tracking-[0.16em] text-white/38">AgentOps control plane</p>
+              <h3 className="text-base font-semibold text-white">Real-time defense cycles and governed autonomy</h3>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {(["copilot", "monitored", "autonomous"] as AgentAutonomyMode[]).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => autonomy.mutate(mode)}
+                disabled={autonomy.isPending}
+                className={`rounded-md border px-2.5 py-1.5 text-xs capitalize transition ${
+                  controlPlane.autonomyMode === mode
+                    ? "border-fuchsia-300/35 bg-fuchsia-400/12 text-fuchsia-50"
+                    : "border-white/10 bg-white/[0.035] text-white/52 hover:bg-white/[0.07]"
+                }`}
+              >
+                {mode}
+              </button>
+            ))}
+            <button
+              onClick={() => runCycle.mutate()}
+              disabled={runCycle.isPending}
+              className="rounded-md bg-gradient-to-r from-guard-violet to-guard-purple px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+            >
+              {runCycle.isPending ? "Running" : "Run defense cycle"}
+            </button>
+          </div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-4">
+          <MiniMetric label="Signals / day" value={`${(controlPlane.telemetry.signalsMonitoredDaily / 1_000_000).toFixed(1)}M`} />
+          <MiniMetric label="P95 latency" value={`${controlPlane.telemetry.p95LatencyMs}ms`} />
+          <MiniMetric label="Precision" value={`${controlPlane.telemetry.agentPrecision.toFixed(1)}%`} />
+          <MiniMetric label="Pending approvals" value={String(controlPlane.telemetry.humanApprovalsPending)} />
+        </div>
+        <div className="mt-3 grid gap-3 2xl:grid-cols-2">
+          {controlPlane.emergingPatterns.slice(0, 2).map((pattern) => (
+            <div key={pattern.id} className="rounded-lg border border-white/10 bg-white/[0.035] p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-white">{pattern.name}</p>
+                  <p className="mt-1 text-xs text-white/42">{pattern.impactEstimate}</p>
+                </div>
+                <span className={`rounded-md border px-2 py-1 text-xs capitalize ${riskClass[pattern.severity]}`}>
+                  {pattern.riskScore}
+                </span>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {pattern.signals.slice(0, 4).map((signal) => (
+                  <span key={signal} className="rounded-md border border-white/10 bg-black/18 px-2 py-1 text-xs text-white/52">
+                    {signal}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="panel p-4">
+        <Header icon={Activity} eyebrow="Deployment readiness" title="Launch gates and action approvals" />
+        <div className="rounded-lg border border-white/10 bg-[#0b0c19]/72 p-3">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-medium text-white">Readiness status</p>
+            <span className={`rounded-md border px-2 py-1 text-xs uppercase ${
+              readiness.status === "pass"
+                ? "border-emerald-300/25 bg-emerald-400/10 text-emerald-100"
+                : readiness.status === "warn"
+                  ? "border-amber-300/25 bg-amber-400/10 text-amber-100"
+                  : "border-rose-300/25 bg-rose-400/10 text-rose-100"
+            }`}>
+              {readiness.status}
+            </span>
+          </div>
+          <div className="mt-3 space-y-2">
+            {readiness.checks.slice(0, 3).map((check) => (
+              <div key={check.id} className="flex items-start gap-2 rounded-md border border-white/10 bg-white/[0.035] p-2">
+                <CheckCircle2 className={`mt-0.5 h-4 w-4 ${check.status === "pass" ? "text-emerald-200" : "text-amber-200"}`} aria-hidden />
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-white">{check.name}</p>
+                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-white/45">{check.detail}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        {nextApproval ? (
+          <div className="mt-3 rounded-lg border border-fuchsia-300/20 bg-fuchsia-400/10 p-3">
+            <p className="text-sm font-medium text-white">{nextApproval.title}</p>
+            <p className="mt-1 text-xs leading-5 text-white/55">{nextApproval.description}</p>
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <span className="rounded-md border border-white/10 bg-black/20 px-2 py-1 text-xs text-white/60">
+                Risk {nextApproval.riskScore}
+              </span>
+              <button
+                onClick={() => approveAction.mutate(nextApproval.id)}
+                disabled={approveAction.isPending}
+                className="rounded-md border border-emerald-300/25 bg-emerald-400/10 px-3 py-1.5 text-xs font-medium text-emerald-100 disabled:opacity-60"
+              >
+                {approveAction.isPending ? "Approving" : "Approve action"}
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -206,6 +358,31 @@ function AgentRunCard({ run }: { run?: AgentRunResult }) {
             </p>
           ))}
         </div>
+        {run.executionPlan?.length ? (
+          <div className="mt-3 rounded-lg border border-white/10 bg-black/18 p-3">
+            <p className="text-xs uppercase tracking-[0.14em] text-white/36">Execution plan</p>
+            <div className="mt-2 space-y-2">
+              {run.executionPlan.map((step) => (
+                <div key={step.id} className="flex items-center justify-between gap-3 text-xs">
+                  <span className="truncate text-white/65">{step.name}</span>
+                  <span className={`shrink-0 rounded-md border px-2 py-1 ${
+                    step.status === "completed"
+                      ? "border-emerald-300/20 bg-emerald-400/10 text-emerald-100"
+                      : "border-amber-300/20 bg-amber-400/10 text-amber-100"
+                  }`}>
+                    {step.status.replace("_", " ")}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+        {run.policyDecision ? (
+          <div className="mt-3 rounded-lg border border-white/10 bg-white/[0.035] p-3">
+            <p className="text-xs uppercase tracking-[0.14em] text-white/36">Policy decision</p>
+            <p className="mt-2 text-xs leading-5 text-white/60">{run.policyDecision.reason}</p>
+          </div>
+        ) : null}
       </div>
     </div>
   );

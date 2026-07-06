@@ -1,6 +1,6 @@
-import { Body, Controller, Get, Headers, Param, Post } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Get, Header, Headers, Param, Post } from "@nestjs/common";
 import { DataStoreService } from "./data-store.service";
-import { FraudEventInput, CaseStatus, UserRole } from "./domain";
+import { AgentAutonomyMode, CaseStatus, FraudEventInput, UserRole, eventTypes } from "./domain";
 import { FraudEngineService } from "./modules/fraud/fraud-engine.service";
 import { Roles } from "./modules/security/roles.decorator";
 
@@ -39,6 +39,7 @@ export class AppController {
   @Post("events/score")
   @Roles("analyst", "fraud_investigator", "admin", "institution_partner")
   scoreEvent(@Body() body: FraudEventInput) {
+    this.validateFraudEvent(body);
     const decision = this.fraudEngine.scoreEvent(body);
     const persistence = this.dataStore.ingestEvent(body, decision);
     return {
@@ -171,5 +172,60 @@ export class AppController {
   @Get("training")
   training() {
     return this.dataStore.trainingAcademy();
+  }
+
+  @Get("agentops/control-plane")
+  @Roles("fraud_investigator", "compliance_officer", "admin", "institution_partner")
+  agentOpsControlPlane() {
+    return this.dataStore.agentOpsControlPlane();
+  }
+
+  @Post("agentops/run-cycle")
+  @Roles("fraud_investigator", "admin")
+  runAgentOpsCycle(@Headers() headers: Record<string, string | string[] | undefined>) {
+    return this.dataStore.runAgenticDefenseCycle(actorFrom(headers), roleFrom(headers));
+  }
+
+  @Post("agentops/actions/:id/approve")
+  @Roles("fraud_investigator", "compliance_officer", "admin")
+  approveAgentAction(
+    @Param("id") id: string,
+    @Headers() headers: Record<string, string | string[] | undefined>,
+  ) {
+    return this.dataStore.approveAgentAction(id, actorFrom(headers), roleFrom(headers));
+  }
+
+  @Post("agentops/autonomy")
+  @Roles("admin")
+  setAutonomy(
+    @Body() body: { mode: AgentAutonomyMode },
+    @Headers() headers: Record<string, string | string[] | undefined>,
+  ) {
+    return this.dataStore.setAutonomyMode(body.mode, actorFrom(headers), roleFrom(headers));
+  }
+
+  @Get("deployment/readiness")
+  readiness() {
+    return this.dataStore.deploymentReadiness();
+  }
+
+  @Get("metrics")
+  @Header("content-type", "text/plain; version=0.0.4")
+  metrics() {
+    return this.dataStore.prometheusMetrics();
+  }
+
+  private validateFraudEvent(body: FraudEventInput) {
+    if (!body || typeof body !== "object") {
+      throw new BadRequestException("Fraud event body is required.");
+    }
+
+    if (!eventTypes.includes(body.event_type)) {
+      throw new BadRequestException(`event_type must be one of: ${eventTypes.join(", ")}.`);
+    }
+
+    if (!body.user_id || !body.institution_id) {
+      throw new BadRequestException("user_id and institution_id are required.");
+    }
   }
 }
