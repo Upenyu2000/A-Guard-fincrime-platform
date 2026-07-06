@@ -33,6 +33,27 @@ export class SecurityService {
     };
   }
 
+  encryptSecret(value: string, context: string) {
+    const key = createHash("sha256").update(`${this.secret}:${context}`).digest();
+    const iv = randomBytes(12);
+    const cipher = createCipheriv("aes-256-gcm", key, iv);
+    const ciphertext = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
+    const tag = cipher.getAuthTag();
+
+    return {
+      secretRef: `vault://secrets/${this.pseudonymize(context)}`,
+      alg: "AES-256-GCM",
+      keyFingerprint: this.fingerprint(value),
+      iv: iv.toString("base64"),
+      tag: tag.toString("base64"),
+      ciphertext: ciphertext.toString("base64"),
+    };
+  }
+
+  fingerprint(value: string): string {
+    return `sha256:${createHash("sha256").update(value).digest("hex").slice(0, 16)}`;
+  }
+
   decryptFromConsortium(envelope: {
     iv: string;
     tag: string;

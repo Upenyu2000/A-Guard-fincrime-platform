@@ -1,5 +1,5 @@
 import { fallbackPicture } from "./fallback";
-import { AgentAction, AgentAutonomyMode, AgentOpsControlPlane, AgentRunResult, DeploymentReadiness, OperatingPicture, OsintFinding, RiskDecision } from "./types";
+import { AgentAction, AgentAutonomyMode, AgentOpsControlPlane, AgentRunResult, DeploymentReadiness, IntegrationConnection, OperatingPicture, OsintFinding, OsintInvestigationResult, RiskDecision, TransactionMonitoringRecord } from "./types";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 export const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? "http://localhost:4000";
@@ -180,4 +180,76 @@ export async function fetchDeploymentReadiness(): Promise<DeploymentReadiness> {
   });
   if (!response.ok) throw new Error(`Readiness check failed with ${response.status}`);
   return response.json() as Promise<DeploymentReadiness>;
+}
+
+export async function testIntegration(id: string): Promise<{ integration: IntegrationConnection; result: string; checks: string[] }> {
+  const response = await fetch(`${API_URL}/v1/integrations/${id}/test`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-role": "developer",
+      "x-actor": "console.developer",
+    },
+  });
+  if (!response.ok) throw new Error(`Integration test failed with ${response.status}`);
+  return response.json() as Promise<{ integration: IntegrationConnection; result: string; checks: string[] }>;
+}
+
+export async function ingestDemoTransaction(integrationId: string): Promise<{ record: TransactionMonitoringRecord; decision: RiskDecision }> {
+  const response = await fetch(`${API_URL}/v1/transactions/ingest`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-role": "developer",
+    },
+    body: JSON.stringify({
+      integrationId,
+      amount: 42000,
+      currency: "USD",
+      customerId: `demo-customer-${Math.round(Math.random() * 9999)}`,
+      merchantId: "mrc-velo-184",
+      deviceId: "dev-shared-019",
+      ipAddress: "198.51.100.24",
+      beneficiaryId: "ben-mule-7731",
+      signals: {
+        velocity_5m: 6,
+        device_reputation: 78,
+        device_fingerprint_reuse: 8,
+        bot_score: 84,
+        remote_access_tool: true,
+        session_entropy: 21,
+        beneficiary_risk: 81,
+        graph_risk: 77,
+        consortium_hits: 2,
+      },
+    }),
+  });
+  if (!response.ok) throw new Error(`Transaction ingest failed with ${response.status}`);
+  return response.json() as Promise<{ record: TransactionMonitoringRecord; decision: RiskDecision }>;
+}
+
+export async function runLawfulOsintSearch(): Promise<OsintInvestigationResult> {
+  const response = await fetch(`${API_URL}/v1/osint/identity-search`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-role": "investigator",
+      "x-actor": "console.investigator",
+    },
+    body: JSON.stringify({
+      tenantId: "tenant-civic-benefits",
+      caseId: "case-2051",
+      investigatorId: "usr-access-investigator",
+      lawfulBasis: "Public task and fraud prevention investigation",
+      purpose: "Verify declared identity and possible undeclared business association for an open case.",
+      permissionLevel: "enhanced",
+      query: {
+        name: "Amina K.",
+        email: "email_hash_39da",
+        employerOrBusiness: "Northstar Skins",
+      },
+    }),
+  });
+  if (!response.ok) throw new Error(`OSINT search failed with ${response.status}`);
+  return response.json() as Promise<OsintInvestigationResult>;
 }

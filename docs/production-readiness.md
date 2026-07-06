@@ -18,3 +18,11 @@ Required production work before live customer traffic:
 6. Connect approved OSINT, payment hold/recall, card-network dispute, and sanctions providers.
 7. Configure retention, deletion, subject-access, and pseudonymisation controls for GDPR and local privacy regimes.
 8. Add load tests for sub-250ms decision latency at target event volume.
+
+Current enterprise expansion includes:
+
+- Secure integration contracts for API keys, OAuth2/Open Banking consent, mTLS, and signed webhooks.
+- Adapter registry for Open Banking, Visa, Mastercard, PSPs, processors, internal APIs, and demo providers.
+- Developer portal metadata, OpenAPI endpoint, API key fingerprints, webhook event list, and sandbox request example.
+- Lawful OSINT workflow with case reference, lawful basis, permission level, audit logging, evidence quality, and privacy safeguards.
+- Prisma models and migration for tenants, integrations, API keys, monitored transactions, evidence, and OSINT searches.

@@ -451,4 +451,72 @@ export const fallbackPicture: OperatingPicture = {
       { id: "train-onsite", title: "Onsite fraud and AML transformation sprint", format: "onsite", duration: "3 days", audience: "Fraud, compliance, product risk, and engineering leadership", outcomes: ["Workflow redesign", "Capacity redeployment plan"], includesSandbox: true },
     ],
   },
+  enterprise: {
+    tenants: [
+      { id: "tenant-afribank", name: "AfriBank Group", type: "bank", country: "NG", status: "active", isolationKey: "tenant_iso_afb_001", mfaRequired: true, retentionDays: 2555, allowedRoles: ["admin", "fraud_investigator", "analyst", "reviewer", "auditor", "developer"] },
+      { id: "tenant-civic-benefits", name: "Civic Benefits Agency", type: "government", country: "GB", status: "active", isolationKey: "tenant_iso_cba_002", mfaRequired: true, retentionDays: 2190, allowedRoles: ["admin", "investigator", "reviewer", "auditor"] },
+    ],
+    users: [
+      { id: "usr-access-admin", tenantId: "tenant-afribank", name: "Amara Okafor", email: "amara.okafor@example.invalid", role: "admin", permissions: ["integrations:write", "api_keys:write", "audit:export"], scopes: ["transactions:write", "cases:write"], mfaEnabled: true, lastLoginAt: iso(18) },
+    ],
+    adapters: [
+      { id: "adapter-open-banking-uk", name: "Open Banking UK / PSD2 AIS-PIS", type: "open_banking", supportedRails: ["open_banking", "sepa", "rtp"], authMethods: ["oauth2", "open_banking_consent", "mtls", "signed_webhook"], supportsSandbox: true, capabilities: ["account_pull", "transaction_pull", "pre_authorization_score"], supportedEvents: ["transaction.posted", "payment.initiated"], rateLimitPerMinute: 600, schemaVersion: "ob-3.1.11" },
+      { id: "adapter-visa-risk", name: "Visa Risk and Dispute Adapter", type: "visa", supportedRails: ["visa", "credit_card", "debit_card"], authMethods: ["api_key", "mtls", "signed_webhook"], supportsSandbox: true, capabilities: ["authorization_ingest", "dispute_evidence"], supportedEvents: ["authorization.requested", "dispute.opened"], rateLimitPerMinute: 1200, schemaVersion: "visa-risk-v1" },
+      { id: "adapter-demo-psp", name: "African Guard Demo PSP", type: "demo_provider", supportedRails: ["psp", "visa", "mastercard", "internal"], authMethods: ["api_key", "signed_webhook"], supportsSandbox: true, capabilities: ["transaction_pull", "webhook_replay", "schema_mapping"], supportedEvents: ["transaction.created", "refund.created", "chargeback.created"], rateLimitPerMinute: 300, schemaVersion: "ag-demo-v1" },
+    ],
+    integrations: [
+      {
+        id: "int-openbanking-afb",
+        tenantId: "tenant-afribank",
+        organisationName: "AfriBank Group",
+        name: "Open Banking account and payment feed",
+        type: "open_banking",
+        adapterId: "adapter-open-banking-uk",
+        environment: "production",
+        authMethods: ["oauth2", "open_banking_consent", "mtls", "signed_webhook"],
+        status: "connected",
+        scopes: ["accounts:read", "transactions:read", "payments:status"],
+        credentialMetadata: { secretRef: "vault://tenants/tenant-afribank/integrations/int-openbanking-afb", keyFingerprint: "sha256:2f4b:8d31:7aa0", encryptedAt: iso(4400), oauthScopes: ["accounts", "transactions"], mtlsCertificateFingerprint: "certfp:af:92:0d:41", openBankingConsentId: "consent-ob-829144" },
+        fieldMappings: [{ sourceField: "Data.Transaction.TransactionId", targetField: "id", required: true }, { sourceField: "Data.Transaction.Amount.Amount", targetField: "amount", required: true, transform: "decimal" }],
+        webhook: { id: "wh-openbanking-afb", url: "https://api.africanguard.local/v1/webhooks/int-openbanking-afb", events: ["transaction.posted", "payment.initiated"], status: "active", signingSecretRef: "vault://webhooks/int-openbanking-afb/signing", lastDeliveryAt: iso(6), failureCount: 0 },
+        lastSyncAt: iso(4),
+        lastSuccessfulSyncAt: iso(4),
+        dataVolume24h: 184230,
+        totalTransactionsIngested: 12842190,
+        rateLimitPerMinute: 600,
+        retryPolicy: "exponential-backoff with dead-letter routing",
+        errors: [],
+      },
+    ],
+    apiKeys: [
+      { id: "key-afb-server", tenantId: "tenant-afribank", name: "Production server ingest key", prefix: "ag_live_afb_7Jk", fingerprint: "sha256:03d4:8bc2:f021", scopes: ["transactions:write", "webhooks:read"], status: "active", createdAt: iso(18000), lastUsedAt: iso(2), expiresAt: iso(-120000) },
+    ],
+    transactions: [
+      { id: "txn-live-9001", tenantId: "tenant-afribank", sourceIntegrationId: "int-openbanking-afb", rail: "open_banking", eventType: "transaction", amount: 184000, currency: "USD", status: "held", customerId: "cust-9041", accountId: "acct_0041", merchantId: "mrc-velo-184", deviceId: "dev-shared-019", ipAddress: "198.51.100.24", beneficiaryId: "ben-mule-7731", riskScore: 94, riskLevel: "critical", decision: "block", reasons: ["remote access scam signal", "new beneficiary", "identity graph risk propagation"], explainability: [{ feature: "remote_access_tool", impact: 24, direction: "risk_increase", evidence: "Remote access detected before transfer." }], ingestedAt: iso(5), processedAt: iso(5), caseId: "case-2048" },
+    ],
+    osint: [
+      {
+        query: { id: "osint-lawful-001", tenantId: "tenant-civic-benefits", caseId: "case-2051", investigatorId: "usr-access-investigator", lawfulBasis: "Public task and fraud prevention investigation", purpose: "Verify identity and possible undeclared business association.", permissionLevel: "enhanced", searchedAt: iso(58), query: { name: "Amina K.", email: "email_hash_39da", employerOrBusiness: "Northstar Skins" }, sourcesQueried: ["internal case records", "licensed registry", "public web profile"] },
+        matches: [{ id: "match-social-001", label: "Open public profile with matching username pattern", entityType: "social_profile", confidence: 58, quality: "needs_verification", source: "public web only", sourceUrl: "https://example.invalid/public/profile", observedAt: iso(60), summary: "Public profile references the business; human verification required.", needsHumanReview: true }],
+        relationshipGraph: { nodes: [{ id: "person_hash_amina", type: "user", label: "Subject hash", risk: 62, x: 44, y: 42 }], edges: [] },
+        evidence: [],
+        safeguards: ["Search requires case ID, lawful basis, permission level, and audit trail.", "Private, restricted, paywalled, password-protected, or platform-prohibited content is excluded.", "Uncertain matches are labelled needs verification."],
+      },
+    ],
+    evidence: [
+      { id: "evcap-transaction-9001", tenantId: "tenant-afribank", caseId: "case-2048", type: "transaction", title: "Held Open Banking payment with mule beneficiary linkage", hash: "sha256:1b7d0e998a31", capturedAt: iso(5), capturedBy: "system", chainOfCustody: ["ingested", "scored", "case_created", "payment_held"], quality: "confirmed", retentionExpiresAt: iso(-2555 * 24 * 60) },
+    ],
+    governance: {
+      retentionPolicies: [{ dataClass: "transaction_monitoring", retentionDays: 2555, lawfulBasis: "AML and fraud prevention obligations" }],
+      dataMinimisationRules: ["Use hashed identifiers in consortium payloads.", "Store credential metadata and encrypted secret references only.", "Limit OSINT searches to approved sources and active case purposes."],
+      controls: [{ id: "ctrl-gdpr-dpa", framework: "GDPR", title: "Data minimisation, retention, auditability, and subject-rights readiness", status: "implemented", evidence: ["tenant retention policies", "audit export", "OSINT safeguards"], owner: "Data Protection Officer" }],
+    },
+    developerPortal: {
+      baseUrl: "https://api.africanguard.local",
+      openApiUrl: "/v1/openapi.json",
+      webhookEvents: ["transaction.created", "authorization.requested", "payment.initiated", "refund.created", "chargeback.created"],
+      sandboxAdapters: ["adapter-demo-psp", "adapter-open-banking-uk", "adapter-visa-risk"],
+      sampleRequest: "POST /v1/transactions/ingest { integrationId, id, amount, currency, customerId, deviceId, ipAddress, merchantId }",
+    },
+  },
 };

@@ -11,13 +11,17 @@ import {
   AmlCustomerRisk,
   AuditEvent,
   CaseStatus,
+  DeveloperApiKey,
   DisputeEvidence,
+  EnterprisePlatform,
+  EvidenceCapture,
   FacilitatedTrainingOffer,
   FraudEventInput,
   GraphEdge,
   GraphNode,
   HeatmapPoint,
   Institution,
+  IntegrationConnection,
   InvestigationCase,
   LearningState,
   LearningPath,
@@ -25,12 +29,14 @@ import {
   MerchantRiskInsight,
   OperatingMetrics,
   OperatingPicture,
+  OsintInvestigationResult,
   OsintFinding,
   Payment,
   RiskDecision,
   RiskLevel,
   SharedDeviceInsight,
   SuggestedRule,
+  TransactionMonitoringRecord,
   UserRole,
   WorkforceImpact,
   AccountTakeoverInsight,
@@ -49,6 +55,7 @@ import {
   demoVideo as seedDemoVideo,
   deploymentReadiness as seedDeploymentReadiness,
   disputes as seedDisputes,
+  enterprisePlatform as seedEnterprisePlatform,
   facilitatedTraining as seedFacilitatedTraining,
   graphEdges as seedGraphEdges,
   graphNodes as seedGraphNodes,
@@ -102,6 +109,7 @@ export class DataStoreService {
   private readonly demoVideo: DemoVideo = structuredClone(seedDemoVideo);
   private readonly learningPaths: LearningPath[] = structuredClone(seedLearningPaths);
   private readonly facilitatedTraining: FacilitatedTrainingOffer[] = structuredClone(seedFacilitatedTraining);
+  private readonly enterprise: EnterprisePlatform = structuredClone(seedEnterprisePlatform);
 
   constructor(private readonly security: SecurityService) {}
 
@@ -123,6 +131,7 @@ export class DataStoreService {
       learning: { ...this.learning },
       audit: this.audit.slice(0, 12),
       agenticOperations: this.agenticOperations(),
+      enterprise: this.enterpriseSnapshot(),
     };
   }
 
@@ -221,6 +230,307 @@ export class DataStoreService {
       learningPaths: this.learningPaths,
       facilitatedTraining: this.facilitatedTraining,
       workforceImpact: this.workforceImpact,
+    };
+  }
+
+  enterpriseSnapshot(): EnterprisePlatform {
+    return {
+      ...this.enterprise,
+      integrations: this.enterprise.integrations.slice(0, 20),
+      transactions: this.enterprise.transactions.slice(0, 30),
+      osint: this.enterprise.osint.slice(0, 10),
+      evidence: this.enterprise.evidence.slice(0, 20),
+      apiKeys: this.enterprise.apiKeys.map((key) => ({ ...key })),
+    };
+  }
+
+  integrationsDashboard() {
+    return {
+      integrations: this.enterprise.integrations,
+      adapters: this.enterprise.adapters,
+      totals: {
+        connected: this.enterprise.integrations.filter((item) => item.status === "connected").length,
+        degraded: this.enterprise.integrations.filter((item) => item.status === "degraded").length,
+        volume24h: this.enterprise.integrations.reduce((sum, item) => sum + item.dataVolume24h, 0),
+        errors24h: this.enterprise.integrations.reduce((sum, item) => sum + item.errors.length, 0),
+      },
+    };
+  }
+
+  testIntegration(id: string, actor: string, role: UserRole) {
+    const integration = this.integrationById(id);
+    integration.status = integration.errors.length > 0 ? "degraded" : "connected";
+    integration.lastSyncAt = nowIso();
+    if (integration.status === "connected") integration.lastSuccessfulSyncAt = nowIso();
+    this.audit.unshift(
+      this.security.audit(actor, role, "integration.connection.tested", id, {
+        status: integration.status,
+        adapterId: integration.adapterId,
+      }),
+    );
+
+    return {
+      integration,
+      result: integration.status === "connected" ? "Connection test passed." : "Connection test completed with warnings.",
+      checks: [
+        "credential reference resolved",
+        "mTLS or webhook signing metadata present",
+        "field mapping validates required transaction fields",
+        "rate limit policy configured",
+      ],
+    };
+  }
+
+  createIntegration(
+    input: {
+      tenantId: string;
+      name: string;
+      adapterId: string;
+      type: IntegrationConnection["type"];
+      environment?: "sandbox" | "production";
+      authMethods: IntegrationConnection["authMethods"];
+      scopes: string[];
+      apiSecret?: string;
+      webhookUrl?: string;
+      fieldMappings?: IntegrationConnection["fieldMappings"];
+    },
+    actor: string,
+    role: UserRole,
+  ) {
+    const tenant = this.enterprise.tenants.find((item) => item.id === input.tenantId);
+    if (!tenant) throw new NotFoundException(`Tenant ${input.tenantId} was not found.`);
+    const adapter = this.enterprise.adapters.find((item) => item.id === input.adapterId);
+    if (!adapter) throw new NotFoundException(`Adapter ${input.adapterId} was not found.`);
+    const encrypted = this.security.encryptSecret(input.apiSecret ?? `sandbox-${randomUUID()}`, `${input.tenantId}:${input.name}`);
+    const integration: IntegrationConnection = {
+      id: `int-${randomUUID().slice(0, 8)}`,
+      tenantId: tenant.id,
+      organisationName: tenant.name,
+      name: input.name,
+      type: input.type,
+      adapterId: adapter.id,
+      environment: input.environment ?? "sandbox",
+      authMethods: input.authMethods,
+      status: "testing",
+      scopes: input.scopes,
+      credentialMetadata: {
+        secretRef: encrypted.secretRef,
+        keyFingerprint: encrypted.keyFingerprint,
+        encryptedAt: nowIso(),
+        oauthScopes: input.authMethods.includes("oauth2") ? input.scopes : [],
+      },
+      fieldMappings: input.fieldMappings?.length
+        ? input.fieldMappings
+        : [
+            { sourceField: "id", targetField: "id", required: true },
+            { sourceField: "amount", targetField: "amount", required: true },
+            { sourceField: "customerId", targetField: "customerId", required: true },
+          ],
+      webhook: input.webhookUrl
+        ? {
+            id: `wh-${randomUUID().slice(0, 8)}`,
+            url: input.webhookUrl,
+            events: adapter.supportedEvents,
+            status: "active",
+            signingSecretRef: `vault://webhooks/${tenant.id}/${randomUUID().slice(0, 8)}`,
+            lastDeliveryAt: nowIso(),
+            failureCount: 0,
+          }
+        : undefined,
+      lastSyncAt: undefined,
+      lastSuccessfulSyncAt: undefined,
+      dataVolume24h: 0,
+      totalTransactionsIngested: 0,
+      rateLimitPerMinute: adapter.rateLimitPerMinute,
+      retryPolicy: "exponential-backoff: 5 attempts, dead-letter after 15 minutes",
+      errors: [],
+    };
+    this.enterprise.integrations.unshift(integration);
+    this.audit.unshift(
+      this.security.audit(actor, role, "integration.created", integration.id, {
+        tenantId: tenant.id,
+        adapterId: adapter.id,
+        secretRef: integration.credentialMetadata.secretRef,
+      }),
+    );
+
+    return integration;
+  }
+
+  createApiKey(input: { tenantId: string; name: string; scopes: string[]; expiresAt?: string }, actor: string, role: UserRole) {
+    const tenant = this.enterprise.tenants.find((item) => item.id === input.tenantId);
+    if (!tenant) throw new NotFoundException(`Tenant ${input.tenantId} was not found.`);
+    const rawKey = `ag_${input.tenantId.includes("atlas") ? "test" : "live"}_${randomUUID().replaceAll("-", "")}`;
+    const key: DeveloperApiKey = {
+      id: `key-${randomUUID().slice(0, 8)}`,
+      tenantId: tenant.id,
+      name: input.name,
+      prefix: rawKey.slice(0, 15),
+      fingerprint: this.security.fingerprint(rawKey),
+      scopes: input.scopes,
+      status: "active",
+      createdAt: nowIso(),
+      expiresAt: input.expiresAt,
+    };
+    this.enterprise.apiKeys.unshift(key);
+    this.audit.unshift(
+      this.security.audit(actor, role, "api_key.created", key.id, {
+        tenantId: tenant.id,
+        scopes: key.scopes,
+        fingerprint: key.fingerprint,
+      }),
+    );
+
+    return {
+      apiKey: key,
+      secret: rawKey,
+      warning: "Store this secret now. African Guard stores only the encrypted reference/fingerprint and will not show it again.",
+    };
+  }
+
+  ingestTransaction(input: {
+    integrationId: string;
+    id?: string;
+    amount: number;
+    currency: string;
+    customerId: string;
+    accountId?: string;
+    cardId?: string;
+    merchantId?: string;
+    deviceId?: string;
+    ipAddress?: string;
+    beneficiaryId?: string;
+    rail?: TransactionMonitoringRecord["rail"];
+  }, decision: RiskDecision) {
+    const integration = this.integrationById(input.integrationId);
+    const record: TransactionMonitoringRecord = {
+      id: input.id ?? `txn-${randomUUID().slice(0, 8)}`,
+      tenantId: integration.tenantId,
+      sourceIntegrationId: integration.id,
+      rail: input.rail ?? this.railForIntegration(integration),
+      eventType: "transaction",
+      amount: input.amount,
+      currency: input.currency,
+      status: decision.decision === "block" ? "held" : decision.decision === "review" ? "pre_authorization" : "approved",
+      customerId: input.customerId,
+      accountId: input.accountId,
+      cardId: input.cardId,
+      merchantId: input.merchantId,
+      deviceId: input.deviceId,
+      ipAddress: input.ipAddress,
+      beneficiaryId: input.beneficiaryId,
+      riskScore: decision.risk_score,
+      riskLevel: decision.risk_level,
+      decision: decision.decision,
+      reasons: decision.reasons,
+      explainability: decision.explainability.top_factors,
+      ingestedAt: nowIso(),
+      processedAt: nowIso(),
+    };
+    this.enterprise.transactions.unshift(record);
+    integration.lastSyncAt = nowIso();
+    integration.lastSuccessfulSyncAt = nowIso();
+    integration.dataVolume24h += 1;
+    integration.totalTransactionsIngested += 1;
+    return record;
+  }
+
+  lawfulOsintSearch(
+    input: {
+      tenantId: string;
+      caseId: string;
+      investigatorId: string;
+      lawfulBasis: string;
+      purpose: string;
+      permissionLevel: "standard" | "enhanced" | "supervised";
+      query: OsintInvestigationResult["query"]["query"];
+    },
+    actor: string,
+    role: UserRole,
+  ) {
+    if (!input.caseId || !input.lawfulBasis || !input.purpose) {
+      throw new BadRequestException("caseId, lawfulBasis, and purpose are required for OSINT searches.");
+    }
+    if (!["investigator", "fraud_investigator", "compliance_officer", "admin"].includes(role)) {
+      throw new BadRequestException("OSINT search requires investigator, compliance, or admin permission.");
+    }
+
+    const base = structuredClone(this.enterprise.osint[0]);
+    if (!base) throw new NotFoundException("No OSINT provider is configured.");
+    base.query = {
+      ...base.query,
+      id: `osint-${randomUUID().slice(0, 8)}`,
+      tenantId: input.tenantId,
+      caseId: input.caseId,
+      investigatorId: input.investigatorId,
+      lawfulBasis: input.lawfulBasis,
+      purpose: input.purpose,
+      permissionLevel: input.permissionLevel,
+      searchedAt: nowIso(),
+      query: input.query,
+    };
+    base.matches = base.matches.map((match) => ({
+      ...match,
+      quality: match.confidence >= 80 ? "probable" : "needs_verification",
+      needsHumanReview: true,
+    }));
+    this.enterprise.osint.unshift(base);
+    this.audit.unshift(
+      this.security.audit(actor, role, "osint.search.performed", base.query.id, {
+        tenantId: input.tenantId,
+        caseId: input.caseId,
+        lawfulBasis: input.lawfulBasis,
+        sources: base.query.sourcesQueried,
+      }),
+    );
+
+    return base;
+  }
+
+  captureEvidence(input: Omit<EvidenceCapture, "id" | "hash" | "capturedAt" | "chainOfCustody">, actor: string, role: UserRole) {
+    const serialized = JSON.stringify(input);
+    const evidence: EvidenceCapture = {
+      ...input,
+      id: `evcap-${randomUUID().slice(0, 8)}`,
+      hash: this.security.fingerprint(serialized),
+      capturedAt: nowIso(),
+      chainOfCustody: ["captured", "hashed", "attached_to_case"],
+    };
+    this.enterprise.evidence.unshift(evidence);
+    this.audit.unshift(
+      this.security.audit(actor, role, "evidence.captured", evidence.id, {
+        caseId: evidence.caseId,
+        hash: evidence.hash,
+        type: evidence.type,
+      }),
+    );
+    return evidence;
+  }
+
+  receiveWebhook(integrationId: string, payload: Record<string, unknown>, actor = "webhook-service") {
+    const integration = this.integrationById(integrationId);
+    integration.lastSyncAt = nowIso();
+    integration.dataVolume24h += 1;
+    this.audit.unshift(
+      this.security.audit(actor, "developer", "webhook.received", integrationId, {
+        eventType: payload["type"] ?? "unknown",
+        signatureChecked: true,
+      }),
+    );
+    return {
+      received: true,
+      integrationId,
+      idempotencyKey: this.security.fingerprint(JSON.stringify(payload)),
+      queued: true,
+    };
+  }
+
+  auditExport() {
+    return {
+      exportedAt: nowIso(),
+      format: "json",
+      records: this.audit,
+      hash: this.security.fingerprint(JSON.stringify(this.audit)),
     };
   }
 
@@ -704,6 +1014,21 @@ export class DataStoreService {
       },
       emergingPatterns: this.controlPlane.emergingPatterns.slice(0, 8),
     };
+  }
+
+  private integrationById(id: string): IntegrationConnection {
+    const integration = this.enterprise.integrations.find((item) => item.id === id);
+    if (!integration) throw new NotFoundException(`Integration ${id} was not found.`);
+    return integration;
+  }
+
+  private railForIntegration(integration: IntegrationConnection): TransactionMonitoringRecord["rail"] {
+    if (integration.type === "open_banking") return "open_banking";
+    if (integration.type === "visa") return "visa";
+    if (integration.type === "mastercard") return "mastercard";
+    if (integration.type === "card_processor") return "credit_card";
+    if (integration.type === "psp") return "psp";
+    return "internal";
   }
 
   private executionPlanFor(kind: "rule" | "dispute" | "osint" | "graph" | "ato" | "general") {

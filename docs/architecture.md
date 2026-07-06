@@ -35,6 +35,13 @@ African Guard is structured as a cloud-native FinCrime operating system. The loc
 | Workforce optimization | Manual-hours-saved, auto-resolution, false-positive queue clearance, redeployable FTE, cost avoidance, and recommendations for moving staff into higher-value work. |
 | AgentOps governance | `GET /v1/agentops/control-plane`, `POST /v1/agentops/run-cycle`, `POST /v1/agentops/actions/:id/approve`, `POST /v1/agentops/autonomy`, policy thresholds, approval queues, and agent telemetry. |
 | Deployment readiness | `GET /v1/deployment/readiness`, `GET /v1/metrics`, production launch gates for secrets, durable storage, AgentOps governance, and observability. |
+| Bank and payment integrations | `GET /v1/integrations`, `POST /v1/integrations`, `POST /v1/integrations/:id/test`, encrypted credential references, OAuth2/Open Banking consent, mTLS, signed webhooks, field mapping, status, last sync, errors, and volume telemetry. |
+| Payment network adapters | `GET /v1/payment-networks`, adapter registry for Visa, Mastercard, bank APIs, card processors, PSPs, internal APIs, and sandbox providers. |
+| Developer portal | `GET /v1/openapi.json`, `GET/POST /v1/developer/api-keys`, webhook events, sandbox adapters, and request examples. |
+| Transaction monitoring ingestion | `POST /v1/transactions/ingest`, `GET /v1/transactions/monitoring`, pre-authorization scoring and post-transaction monitoring records. |
+| Lawful OSINT and identity tracing | `POST /v1/osint/identity-search`, case reference, lawful basis, permission level, approved sources, evidence quality, and safeguards. |
+| Evidence and audit export | `GET /v1/evidence`, `POST /v1/evidence/capture`, `GET /v1/audit/export`, chain-of-custody hashes and full audit trail export. |
+| Compliance governance | `GET /v1/compliance/governance`, GDPR, Open Banking, PCI DSS scope, AML, investigation, and user access controls. |
 
 ## Real-Time Flow
 
@@ -68,3 +75,18 @@ Agent runs return execution plans, policy decisions, queued action IDs, and evid
 The fraud engine also scores newer real-world attack indicators: persistent device fingerprint reuse, bot or agentic browser automation, remote access tooling, deepfake risk, and low session entropy.
 
 Local state remains deterministic for development. Production deployments should replace the in-memory store with PostgreSQL-backed repositories, Redis/Kafka stream processors, Neo4j graph writes, governed OSINT providers, card-network dispute APIs, payment-rail hold/recall adapters, and vault-managed secrets.
+
+## Enterprise Integration Layer
+
+The integration layer uses clean adapter boundaries:
+
+- `integrations-service`: credential references, connection testing, field mapping, and adapter orchestration.
+- `transaction-ingestion-service`: queue ingestion, idempotency, schema normalisation, retry and dead-letter handling.
+- `risk-scoring-service`: real-time scoring, explainability, model monitoring, and review routing.
+- `case-management-service`: case creation, timelines, SAR/STR drafts, and escalations.
+- `osint-search-service`: lawful basis enforcement and permissioned source search.
+- `evidence-service`: screenshot/document/evidence capture, hashing, chain of custody, and retention.
+- `audit-log-service`: immutable audit events and audit exports.
+- `api-key-service`: key generation, fingerprint storage, scopes, and rotation.
+- `webhook-service`: signed webhook receipt, replay protection, retries, and rate limits.
+- `user-access-service`: MFA, tenant isolation, RBAC scopes, and governance.

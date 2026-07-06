@@ -13,6 +13,16 @@ export type CaseStatus =
   | "escalated"
   | "recovered"
   | "closed";
+export type UserRole =
+  | "analyst"
+  | "investigator"
+  | "fraud_investigator"
+  | "compliance_officer"
+  | "reviewer"
+  | "auditor"
+  | "developer"
+  | "admin"
+  | "institution_partner";
 
 export interface Metrics {
   fraudDetectionRate: number;
@@ -170,6 +180,13 @@ export interface AuditEvent {
   target: string;
   metadata: Record<string, unknown>;
   createdAt: string;
+}
+
+export interface ExplainabilityFactor {
+  feature: string;
+  impact: number;
+  direction: "risk_increase" | "risk_decrease";
+  evidence: string;
 }
 
 export type AgentStatus = "idle" | "running" | "ready" | "needs_review";
@@ -494,6 +511,265 @@ export interface AgenticOperations {
   facilitatedTraining: FacilitatedTrainingOffer[];
 }
 
+export type OrganisationType = "bank" | "fintech" | "government" | "insurer" | "psp" | "processor" | "enterprise";
+export type IntegrationType =
+  | "open_banking"
+  | "bank_api"
+  | "visa"
+  | "mastercard"
+  | "card_processor"
+  | "psp"
+  | "internal_api"
+  | "demo_provider";
+export type AuthMethod = "api_key" | "oauth2" | "open_banking_consent" | "mtls" | "signed_webhook";
+export type IntegrationStatus = "draft" | "testing" | "connected" | "degraded" | "failed" | "paused";
+export type ApiKeyStatus = "active" | "rotating" | "revoked";
+export type TransactionRail =
+  | "open_banking"
+  | "ach"
+  | "wire"
+  | "rtp"
+  | "sepa"
+  | "visa"
+  | "mastercard"
+  | "debit_card"
+  | "credit_card"
+  | "psp"
+  | "internal";
+export type EvidenceQuality = "confirmed" | "probable" | "possible" | "needs_verification";
+
+export interface TenantOrganisation {
+  id: string;
+  name: string;
+  type: OrganisationType;
+  country: string;
+  status: "active" | "suspended" | "onboarding";
+  isolationKey: string;
+  mfaRequired: boolean;
+  retentionDays: number;
+  allowedRoles: UserRole[];
+}
+
+export interface UserAccessProfile {
+  id: string;
+  tenantId: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  permissions: string[];
+  scopes: string[];
+  mfaEnabled: boolean;
+  lastLoginAt: string;
+}
+
+export interface FieldMapping {
+  sourceField: string;
+  targetField: string;
+  required: boolean;
+  transform?: string;
+}
+
+export interface IntegrationErrorLog {
+  at: string;
+  code: string;
+  message: string;
+  retryable: boolean;
+}
+
+export interface WebhookEndpoint {
+  id: string;
+  url: string;
+  events: string[];
+  status: "active" | "failing" | "disabled";
+  signingSecretRef: string;
+  lastDeliveryAt: string;
+  failureCount: number;
+}
+
+export interface IntegrationCredentialMetadata {
+  secretRef: string;
+  keyFingerprint: string;
+  encryptedAt: string;
+  oauthScopes: string[];
+  mtlsCertificateFingerprint?: string;
+  openBankingConsentId?: string;
+}
+
+export interface IntegrationConnection {
+  id: string;
+  tenantId: string;
+  organisationName: string;
+  name: string;
+  type: IntegrationType;
+  adapterId: string;
+  environment: "sandbox" | "production";
+  authMethods: AuthMethod[];
+  status: IntegrationStatus;
+  scopes: string[];
+  credentialMetadata: IntegrationCredentialMetadata;
+  fieldMappings: FieldMapping[];
+  webhook?: WebhookEndpoint;
+  lastSyncAt?: string;
+  lastSuccessfulSyncAt?: string;
+  dataVolume24h: number;
+  totalTransactionsIngested: number;
+  rateLimitPerMinute: number;
+  retryPolicy: string;
+  errors: IntegrationErrorLog[];
+}
+
+export interface PaymentNetworkAdapter {
+  id: string;
+  name: string;
+  type: IntegrationType;
+  supportedRails: TransactionRail[];
+  authMethods: AuthMethod[];
+  supportsSandbox: boolean;
+  capabilities: string[];
+  supportedEvents: string[];
+  rateLimitPerMinute: number;
+  schemaVersion: string;
+}
+
+export interface DeveloperApiKey {
+  id: string;
+  tenantId: string;
+  name: string;
+  prefix: string;
+  fingerprint: string;
+  scopes: string[];
+  status: ApiKeyStatus;
+  createdAt: string;
+  lastUsedAt?: string;
+  expiresAt?: string;
+}
+
+export interface TransactionMonitoringRecord {
+  id: string;
+  tenantId: string;
+  sourceIntegrationId: string;
+  rail: TransactionRail;
+  eventType: "transaction" | "login" | "device_change" | "account_update" | "beneficiary_creation";
+  amount: number;
+  currency: string;
+  status: "pre_authorization" | "approved" | "held" | "blocked" | "posted" | "recalled";
+  customerId: string;
+  accountId?: string;
+  cardId?: string;
+  merchantId?: string;
+  deviceId?: string;
+  ipAddress?: string;
+  beneficiaryId?: string;
+  riskScore: number;
+  riskLevel: RiskLevel;
+  decision: Decision;
+  reasons: string[];
+  explainability: ExplainabilityFactor[];
+  ingestedAt: string;
+  processedAt: string;
+  caseId?: string;
+}
+
+export interface OsintIdentityQuery {
+  id: string;
+  tenantId: string;
+  caseId: string;
+  investigatorId: string;
+  lawfulBasis: string;
+  purpose: string;
+  permissionLevel: "standard" | "enhanced" | "supervised";
+  searchedAt: string;
+  query: {
+    name?: string;
+    dateOfBirth?: string;
+    address?: string;
+    nationalInsuranceOrReference?: string;
+    phone?: string;
+    email?: string;
+    knownAssociates?: string[];
+    employerOrBusiness?: string;
+    vehicleOrPropertyReference?: string;
+  };
+  sourcesQueried: string[];
+}
+
+export interface OsintIdentityMatch {
+  id: string;
+  label: string;
+  entityType: "person" | "address" | "company" | "phone" | "email" | "social_profile" | "vehicle" | "property";
+  confidence: number;
+  quality: EvidenceQuality;
+  source: string;
+  sourceUrl?: string;
+  observedAt: string;
+  summary: string;
+  needsHumanReview: boolean;
+}
+
+export interface EvidenceCapture {
+  id: string;
+  tenantId: string;
+  caseId: string;
+  type: "screenshot" | "document" | "transaction" | "webpage" | "note" | "graph";
+  title: string;
+  sourceUrl?: string;
+  hash: string;
+  capturedAt: string;
+  capturedBy: string;
+  chainOfCustody: string[];
+  quality: EvidenceQuality;
+  retentionExpiresAt: string;
+}
+
+export interface OsintInvestigationResult {
+  query: OsintIdentityQuery;
+  matches: OsintIdentityMatch[];
+  relationshipGraph: {
+    nodes: GraphNode[];
+    edges: GraphEdge[];
+  };
+  evidence: EvidenceCapture[];
+  safeguards: string[];
+}
+
+export interface ComplianceControl {
+  id: string;
+  framework: "GDPR" | "Open Banking" | "PCI DSS" | "AML" | "Fraud Investigation" | "Access Governance";
+  title: string;
+  status: "implemented" | "requires_configuration" | "monitoring";
+  evidence: string[];
+  owner: string;
+}
+
+export interface ComplianceGovernance {
+  retentionPolicies: Array<{
+    dataClass: string;
+    retentionDays: number;
+    lawfulBasis: string;
+  }>;
+  dataMinimisationRules: string[];
+  controls: ComplianceControl[];
+}
+
+export interface EnterprisePlatform {
+  tenants: TenantOrganisation[];
+  users: UserAccessProfile[];
+  integrations: IntegrationConnection[];
+  adapters: PaymentNetworkAdapter[];
+  apiKeys: DeveloperApiKey[];
+  transactions: TransactionMonitoringRecord[];
+  osint: OsintInvestigationResult[];
+  evidence: EvidenceCapture[];
+  governance: ComplianceGovernance;
+  developerPortal: {
+    baseUrl: string;
+    openApiUrl: string;
+    webhookEvents: string[];
+    sandboxAdapters: string[];
+    sampleRequest: string;
+  };
+}
+
 export interface OperatingPicture {
   metrics: Metrics;
   alerts: Alert[];
@@ -515,6 +791,7 @@ export interface OperatingPicture {
   learning: LearningState;
   audit: AuditEvent[];
   agenticOperations: AgenticOperations;
+  enterprise: EnterprisePlatform;
 }
 
 export interface RiskDecision {

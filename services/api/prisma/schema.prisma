@@ -152,3 +152,110 @@ model AuditLog {
   metadata  Json
   createdAt DateTime @default(now())
 }
+
+model Tenant {
+  id            String   @id
+  name          String
+  type          String
+  country       String
+  status        String
+  isolationKey  String   @unique
+  mfaRequired   Boolean  @default(true)
+  retentionDays Int
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model IntegrationConnection {
+  id                         String   @id
+  tenantId                   String
+  name                       String
+  type                       String
+  adapterId                  String
+  environment                String
+  authMethods                Json
+  status                     String
+  scopes                     Json
+  encryptedCredentialRef     String
+  credentialFingerprint      String
+  fieldMappings              Json
+  webhook                    Json?
+  lastSyncAt                 DateTime?
+  lastSuccessfulSyncAt       DateTime?
+  dataVolume24h              Int      @default(0)
+  totalTransactionsIngested  Int      @default(0)
+  rateLimitPerMinute         Int
+  retryPolicy                String
+  errors                     Json
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+}
+
+model DeveloperApiKey {
+  id          String   @id
+  tenantId    String
+  name        String
+  prefix      String
+  fingerprint String   @unique
+  scopes      Json
+  status      String
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime @default(now())
+}
+
+model TransactionMonitor {
+  id                  String   @id
+  tenantId            String
+  sourceIntegrationId String
+  rail                String
+  eventType           String
+  amount              Decimal
+  currency            String
+  status              String
+  customerId          String
+  accountId           String?
+  cardId              String?
+  merchantId          String?
+  deviceId            String?
+  ipAddress           String?
+  beneficiaryId       String?
+  riskScore           Int
+  riskLevel           RiskLevel
+  decision            Decision
+  reasons             Json
+  explainability      Json
+  caseId              String?
+  ingestedAt          DateTime
+  processedAt         DateTime
+}
+
+model EvidenceCapture {
+  id                 String   @id
+  tenantId           String
+  caseId             String
+  type               String
+  title              String
+  sourceUrl          String?
+  hash               String
+  capturedBy         String
+  chainOfCustody     Json
+  quality            String
+  retentionExpiresAt DateTime
+  capturedAt         DateTime @default(now())
+}
+
+model OsintSearch {
+  id              String   @id
+  tenantId        String
+  caseId          String
+  investigatorId  String
+  lawfulBasis     String
+  purpose         String
+  permissionLevel String
+  query           Json
+  sourcesQueried  Json
+  matches         Json
+  safeguards      Json
+  searchedAt      DateTime @default(now())
+}

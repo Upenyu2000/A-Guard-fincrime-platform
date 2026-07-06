@@ -29,6 +29,7 @@ import {
   Users,
 } from "lucide-react";
 import { AgenticOpsPanel } from "./AgenticOpsPanel";
+import { EnterprisePlatformPanel } from "./EnterprisePlatformPanel";
 import {
   chatCase,
   fetchOperatingPicture,
@@ -146,6 +147,7 @@ export function OperatingConsole() {
             <div className="min-w-0 space-y-4">
               <MetricStrip picture={current} />
               <AgenticOpsPanel picture={current} />
+              <EnterprisePlatformPanel picture={current} />
               <div className="grid gap-4 2xl:grid-cols-[minmax(0,0.95fr)_minmax(360px,0.55fr)]">
                 <LiveOperations picture={current} />
                 <PaymentTracking picture={current} />

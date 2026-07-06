@@ -32,12 +32,17 @@ class BehaviourSignals(BaseModel):
     velocity_24h: float = 0
     device_age_hours: float = 720
     device_reputation: float = 0
+    device_fingerprint_reuse: float = 0
     ip_risk: float = 0
     geo_velocity_kmh: float = 0
     account_age_days: float = 365
     email_risk: float = 0
     phone_risk: float = 0
     behavior_deviation: float = 0
+    bot_score: float = 0
+    remote_access_tool: bool = False
+    deepfake_risk: float = 0
+    session_entropy: float = 50
     beneficiary_risk: float = 0
     graph_risk: float = 0
     consortium_hits: float = 0
@@ -84,12 +89,17 @@ FEATURE_NAMES = [
     "velocity_5m",
     "velocity_24h",
     "device_reputation",
+    "device_fingerprint_reuse",
     "ip_risk",
     "geo_velocity_kmh",
     "account_age_days",
     "email_risk",
     "phone_risk",
     "behavior_deviation",
+    "bot_score",
+    "remote_access_tool",
+    "deepfake_risk",
+    "session_entropy",
     "beneficiary_risk",
     "graph_risk",
     "consortium_hits",
@@ -101,8 +111,16 @@ FEATURE_NAMES = [
 
 def build_training_matrix() -> np.ndarray:
     rng = np.random.default_rng(42)
-    normal = rng.normal(loc=[0.8, 1.8, 6, 18, 19, 80, 420, 12, 10, 15, 18, 21, 0.1, 11, 16, 80], scale=8, size=(400, 16))
-    risky = rng.normal(loc=[4.5, 6.5, 24, 74, 72, 980, 9, 71, 64, 78, 82, 79, 2, 78, 73, 540], scale=12, size=(90, 16))
+    normal = rng.normal(
+        loc=[0.8, 1.8, 6, 18, 2, 19, 80, 420, 12, 10, 15, 12, 0, 8, 62, 18, 21, 0.1, 11, 16, 80],
+        scale=8,
+        size=(400, 21),
+    )
+    risky = rng.normal(
+        loc=[4.5, 6.5, 24, 74, 9, 72, 980, 9, 71, 64, 78, 84, 1, 69, 22, 82, 79, 2, 78, 73, 540],
+        scale=12,
+        size=(90, 21),
+    )
     return np.clip(np.vstack([normal, risky]), 0, None)
 
 
