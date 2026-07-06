@@ -1,0 +1,24 @@
+{
+  "name": "african-guard",
+  "version": "0.1.0",
+  "private": true,
+  "description": "African Guard fraud intelligence and prevention operating system.",
+  "workspaces": [
+    "apps/web",
+    "services/api"
+  ],
+  "scripts": {
+    "dev": "concurrently -n web,api -c magenta,cyan \"npm run dev:web\" \"npm run dev:api\"",
+    "dev:web": "npm run dev -w @african-guard/web",
+    "dev:api": "npm run start:dev -w @african-guard/api",
+    "build": "npm run build -w @african-guard/api && npm run build -w @african-guard/web",
+    "lint": "npm run lint -w @african-guard/web && npm run lint -w @african-guard/api",
+    "typecheck": "npm run typecheck -w @african-guard/web && npm run typecheck -w @african-guard/api",
+    "ai": "python -m uvicorn services.ai.app.main:app --reload --host 0.0.0.0 --port 8001",
+    "prisma:generate": "npm run prisma:generate -w @african-guard/api"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "typescript": "^5.9.2"
+  }
+}

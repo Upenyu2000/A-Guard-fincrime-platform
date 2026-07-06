@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-label="African Guard demo video poster">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop stop-color="#151028"/>
+      <stop offset="0.45" stop-color="#0b0c19"/>
+      <stop offset="1" stop-color="#142420"/>
+    </linearGradient>
+    <linearGradient id="violet" x1="0" x2="1">
+      <stop stop-color="#7C3AED"/>
+      <stop offset="1" stop-color="#A855F7"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="720" fill="url(#bg)"/>
+  <rect x="72" y="76" width="1136" height="568" rx="28" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.18)"/>
+  <rect x="116" y="120" width="214" height="468" rx="18" fill="rgba(255,255,255,0.06)"/>
+  <rect x="366" y="120" width="726" height="468" rx="18" fill="rgba(255,255,255,0.045)"/>
+  <circle cx="728" cy="354" r="82" fill="url(#violet)" opacity="0.95"/>
+  <path d="M704 309 L704 399 L782 354 Z" fill="#fff"/>
+  <text x="116" y="104" fill="#fff" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="700">African Guard</text>
+  <text x="116" y="173" fill="#fff" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="700">Agentic Fraud Ops</text>
+  <text x="116" y="214" fill="#b8b4c7" font-family="Inter, Arial, sans-serif" font-size="16">Run agents. Find rings. Train teams.</text>
+  <rect x="406" y="162" width="240" height="112" rx="14" fill="rgba(124,58,237,0.22)" stroke="rgba(168,85,247,0.4)"/>
+  <rect x="678" y="162" width="240" height="112" rx="14" fill="rgba(45,212,191,0.12)" stroke="rgba(45,212,191,0.28)"/>
+  <rect x="406" y="424" width="512" height="108" rx="14" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>
+  <text x="430" y="206" fill="#fff" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700">Merchant collusion</text>
+  <text x="702" y="206" fill="#fff" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700">Guided training</text>
+  <text x="430" y="471" fill="#fff" font-family="Inter, Arial, sans-serif" font-size="18" font-weight="700">Demo walkthrough included</text>
+</svg>

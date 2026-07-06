@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: african-guard-ai
+  namespace: african-guard
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: african-guard-ai
+  template:
+    metadata:
+      labels:
+        app: african-guard-ai
+    spec:
+      containers:
+        - name: ai
+          image: african-guard/ai:0.1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8001
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8001
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 500m
+              memory: 768Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: african-guard-ai
+  namespace: african-guard
+spec:
+  selector:
+    app: african-guard-ai
+  ports:
+    - name: http
+      port: 8001
+      targetPort: 8001

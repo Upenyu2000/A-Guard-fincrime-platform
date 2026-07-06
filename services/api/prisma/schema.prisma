@@ -1,0 +1,154 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum EventType {
+  TRANSACTION
+  LOGIN
+  DEVICE_CHANGE
+  ACCOUNT_UPDATE
+  BENEFICIARY_CREATION
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum Decision {
+  APPROVE
+  REVIEW
+  BLOCK
+}
+
+enum CaseStatus {
+  NEW
+  INVESTIGATING
+  ESCALATED
+  RECOVERED
+  CLOSED
+}
+
+enum PaymentStatus {
+  INITIATED
+  IN_FLIGHT
+  HELD
+  FLAGGED
+  RECALLED
+  COMPLETED
+}
+
+model Institution {
+  id             String   @id @default(cuid())
+  name           String
+  country        String
+  trustScore     Int
+  reputation     Int
+  encryptedKeyId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  alerts         Alert[]
+}
+
+model FraudEvent {
+  id                String    @id
+  type              EventType
+  subjectHash       String
+  amount            Decimal?
+  currency          String?
+  riskScore         Int
+  riskLevel         RiskLevel
+  decision          Decision
+  reasons           Json
+  componentScores   Json
+  latencyMs         Int
+  institutionId     String?
+  createdAt         DateTime  @default(now())
+  alert             Alert?
+}
+
+model Alert {
+  id            String      @id
+  eventId       String      @unique
+  event         FraudEvent  @relation(fields: [eventId], references: [id])
+  institutionId String?
+  institution   Institution? @relation(fields: [institutionId], references: [id])
+  title         String
+  severity      RiskLevel
+  route         Json
+  createdAt     DateTime    @default(now())
+  case          Case?
+}
+
+model Case {
+  id          String     @id
+  alertId     String?    @unique
+  alert       Alert?     @relation(fields: [alertId], references: [id])
+  title       String
+  assignee    String
+  status      CaseStatus @default(NEW)
+  priority    RiskLevel
+  timeline    Json
+  evidence    Json
+  sarDraft    String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Payment {
+  id              String        @id
+  amount          Decimal
+  currency        String
+  origin          String
+  destination     String
+  status          PaymentStatus
+  recallAvailable Boolean       @default(false)
+  route           Json
+  riskSignals     Json
+  updatedAt       DateTime      @updatedAt
+}
+
+model GraphEntity {
+  id        String   @id
+  type      String
+  label     String
+  risk      Int
+  metadata  Json
+  createdAt DateTime @default(now())
+}
+
+model GraphEdge {
+  id        String   @id
+  sourceId  String
+  targetId  String
+  type      String
+  weight    Float
+  createdAt DateTime @default(now())
+}
+
+model LearningFeedback {
+  id          String   @id @default(cuid())
+  caseId      String
+  label       String
+  analyst     String
+  notes       String
+  featureHash String
+  createdAt   DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actor     String
+  role      String
+  action    String
+  target    String
+  metadata  Json
+  createdAt DateTime @default(now())
+}
