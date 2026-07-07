@@ -7,9 +7,12 @@ import { DataStoreService } from "./data-store.service";
 import { FraudEngineService } from "./modules/fraud/fraud-engine.service";
 import { RealtimeGateway } from "./modules/realtime/realtime.gateway";
 import { JwtAuthGuard } from "./modules/security/jwt-auth.guard";
+import { ProductionSafetyGuard } from "./modules/security/production-safety.guard";
 import { RbacGuard } from "./modules/security/rbac.guard";
 import { SecurityService } from "./modules/security/security.service";
+import { TenantContextGuard } from "./modules/security/tenant-context.guard";
 import { TokenVerifierService } from "./modules/security/token-verifier.service";
+import { WebhookVerificationGuard } from "./modules/security/webhook-verification.guard";
 import { IntegrationsService } from "./modules/integrations-service/integrations-service.service";
 import { TransactionIngestionService } from "./modules/transaction-ingestion-service/transaction-ingestion-service.service";
 import { RiskScoringService } from "./modules/risk-scoring-service/risk-scoring-service.service";
@@ -55,6 +58,18 @@ import { UserAccessService } from "./modules/user-access-service/user-access-ser
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: WebhookVerificationGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: TenantContextGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: ProductionSafetyGuard,
     },
     {
       provide: APP_GUARD,
