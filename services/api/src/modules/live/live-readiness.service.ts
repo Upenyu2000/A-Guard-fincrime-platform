@@ -33,6 +33,37 @@ export class LiveReadinessService implements OnModuleDestroy {
     };
   }
 
+  startup() {
+    const environment = process.env.NODE_ENV ?? "development";
+    const required = [
+      "DATABASE_URL",
+      "REDIS_URL",
+      "KAFKA_BROKERS",
+      "AI_SERVICE_URL",
+      "OAUTH_ISSUER_URL",
+      "OAUTH_AUDIENCE",
+      "ENCRYPTION_MASTER_KEY",
+      "ENCRYPTION_KEY_REF",
+      "API_KEY_PEPPER",
+      "CORS_ALLOWED_ORIGINS",
+    ];
+    const missing = required.filter((name) => !process.env[name]);
+    const demoEnabled = [
+      process.env.DEMO_MODE,
+      process.env.AI_DEMO_MODE,
+      process.env.NEXT_PUBLIC_DEMO_MODE,
+    ].some((value) => value === "true");
+    const blocked = missing.length > 0 || (environment === "production" && demoEnabled);
+
+    return {
+      status: blocked ? "blocked" : "ready",
+      environment,
+      missingConfiguration: missing,
+      demoModeEnabled: demoEnabled,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
   async readiness() {
     const [postgres, redis, kafka, ai] = await Promise.all([
       this.measure(() => this.prisma.ping()),
