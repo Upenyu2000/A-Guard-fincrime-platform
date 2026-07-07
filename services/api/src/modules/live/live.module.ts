@@ -9,6 +9,7 @@ import { LiveOperationsService } from "./live-operations.service";
 import { LiveReadinessService } from "./live-readiness.service";
 import { LiveRiskScoringService } from "./live-risk-scoring.service";
 import { LiveTransactionService } from "./live-transaction.service";
+import { LiveWebhookService } from "./live-webhook.service";
 import { OutboxDispatcherService } from "./outbox-dispatcher.service";
 
 @Module({
@@ -23,6 +24,7 @@ import { OutboxDispatcherService } from "./outbox-dispatcher.service";
     LiveCaseService,
     LiveOperationsService,
     LiveReadinessService,
+    LiveWebhookService,
     OutboxDispatcherService,
   ],
   exports: [PrismaService, ApiKeyService, AuditLogService, LiveReadinessService],
