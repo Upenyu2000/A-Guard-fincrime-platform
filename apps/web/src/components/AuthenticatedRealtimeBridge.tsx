@@ -13,7 +13,7 @@ export function AuthenticatedRealtimeBridge() {
     const token = getAccessToken();
     if (!token) {
       setConnected(false);
-      return;
+      return undefined;
     }
 
     const socket = io(WS_URL, {
@@ -35,7 +35,9 @@ export function AuthenticatedRealtimeBridge() {
       }
     });
 
-    return () => socket.close();
+    return () => {
+      socket.close();
+    };
   }, [pushAlert, setConnected, setLastDecisionScore, setPicture]);
 
   return null;
