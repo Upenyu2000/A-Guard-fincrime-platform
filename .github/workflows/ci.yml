@@ -45,6 +45,17 @@ jobs:
         run: npm run prisma:validate -w @african-guard/api
       - name: Generate Prisma client
         run: npm run prisma:generate -w @african-guard/api
+      - name: Generate initial migration SQL
+        run: >-
+          npx prisma migrate diff --from-empty
+          --to-schema services/api/prisma/schema.prisma
+          --script > initial-migration.sql
+      - name: Upload migration SQL
+        uses: actions/upload-artifact@v4
+        with:
+          name: initial-migration-sql
+          path: initial-migration.sql
+          retention-days: 7
       - name: Apply test database schema
         run: npx prisma db push --schema services/api/prisma/schema.prisma --skip-generate
       - name: Typecheck
