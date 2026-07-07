@@ -6,8 +6,10 @@ import { AppController } from "./app.controller";
 import { DataStoreService } from "./data-store.service";
 import { FraudEngineService } from "./modules/fraud/fraud-engine.service";
 import { RealtimeGateway } from "./modules/realtime/realtime.gateway";
+import { JwtAuthGuard } from "./modules/security/jwt-auth.guard";
 import { RbacGuard } from "./modules/security/rbac.guard";
 import { SecurityService } from "./modules/security/security.service";
+import { TokenVerifierService } from "./modules/security/token-verifier.service";
 import { IntegrationsService } from "./modules/integrations-service/integrations-service.service";
 import { TransactionIngestionService } from "./modules/transaction-ingestion-service/transaction-ingestion-service.service";
 import { RiskScoringService } from "./modules/risk-scoring-service/risk-scoring-service.service";
@@ -35,6 +37,7 @@ import { UserAccessService } from "./modules/user-access-service/user-access-ser
     FraudEngineService,
     RealtimeGateway,
     SecurityService,
+    TokenVerifierService,
     IntegrationsService,
     TransactionIngestionService,
     RiskScoringService,
@@ -48,6 +51,10 @@ import { UserAccessService } from "./modules/user-access-service/user-access-ser
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
     },
     {
       provide: APP_GUARD,
