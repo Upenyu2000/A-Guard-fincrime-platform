@@ -11,7 +11,7 @@ import { AuthenticatedRequest } from "./auth.types";
 export class TenantContextGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
-    const route = (request.originalUrl ?? request.url ?? "").split("?")[0];
+    const route = (request.originalUrl ?? request.url ?? "").split("?")[0] ?? "";
 
     if (route === "/v1/health" || route === "/v1/health/live") return true;
     if (/^\/v1\/webhooks\/[^/]+$/u.test(route)) return true;
