@@ -86,6 +86,7 @@ jobs:
             -v "$PWD:/repo" \
             zricethezav/gitleaks:v8.28.0 \
             detect --source=/repo --no-git --redact \
+            --config=/repo/.gitleaks.toml \
             --report-format=json \
             --report-path=/repo/gitleaks-report.json \
             --exit-code=1
