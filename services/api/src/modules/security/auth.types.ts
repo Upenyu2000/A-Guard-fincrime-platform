@@ -15,6 +15,11 @@ export interface AuthenticatedRequest {
   headers: Record<string, string | string[] | undefined>;
   user?: AuthenticatedPrincipal;
   rawBody?: Buffer;
+  body?: Record<string, unknown>;
+  method?: string;
+  url?: string;
+  originalUrl?: string;
+  params?: Record<string, string | undefined>;
 }
 
 export const supportedRoles: ReadonlySet<UserRole> = new Set<UserRole>([
