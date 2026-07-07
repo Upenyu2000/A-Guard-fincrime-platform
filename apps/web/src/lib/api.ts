@@ -251,17 +251,25 @@ export interface LawfulOsintSearchInput {
   query: Record<string, unknown>;
 }
 
-export async function runLawfulOsintSearch(
-  input?: LawfulOsintSearchInput,
+export async function runGovernedOsintSearch(
+  input: LawfulOsintSearchInput,
 ): Promise<OsintInvestigationResult> {
-  if (!input) {
-    throw new ApiError(
-      "A case ID, lawful basis, purpose, permission level, and search query are required.",
-      400,
-    );
-  }
   return apiFetch<OsintInvestigationResult>("/v1/osint/identity-search", {
     method: "POST",
     body: JSON.stringify(input),
+  });
+}
+
+export async function runLawfulOsintSearch(): Promise<OsintInvestigationResult> {
+  requireDemoMode("Sandbox OSINT search");
+  return runGovernedOsintSearch({
+    caseId: "sandbox-case-osint-001",
+    lawfulBasis: "Synthetic sandbox training exercise",
+    purpose: "Validate the governed OSINT workflow using synthetic data only.",
+    permissionLevel: "standard",
+    query: {
+      name: "Synthetic Subject 001",
+      employerOrBusiness: "Synthetic Merchant Ltd",
+    },
   });
 }
