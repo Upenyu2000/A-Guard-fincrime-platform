@@ -6,7 +6,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -36,6 +36,8 @@ jobs:
       RUN_DATABASE_TESTS: "true"
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -45,19 +47,37 @@ jobs:
         run: npm run prisma:validate -w @african-guard/api
       - name: Generate Prisma client
         run: npm run prisma:generate -w @african-guard/api
-      - name: Generate initial migration SQL
-        run: >-
-          npx prisma migrate diff --from-empty
-          --to-schema-datamodel services/api/prisma/schema.prisma
-          --script > initial-migration.sql
+      - name: Generate committed initial migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          migration_dir="services/api/prisma/migrations/20260707000000_initial_production_schema"
+          mkdir -p "$migration_dir"
+          npx prisma migrate diff --from-empty \
+            --to-schema-datamodel services/api/prisma/schema.prisma \
+            --script > "$migration_dir/migration.sql"
+          printf 'provider = "postgresql"\n' > services/api/prisma/migrations/migration_lock.toml
       - name: Upload migration SQL
         uses: actions/upload-artifact@v4
         with:
           name: initial-migration-sql
-          path: initial-migration.sql
+          path: services/api/prisma/migrations
           retention-days: 7
-      - name: Apply test database schema
-        run: npx prisma db push --schema services/api/prisma/schema.prisma --skip-generate
+      - name: Commit generated migration to the PR branch
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        shell: bash
+        run: |
+          if git diff --quiet -- services/api/prisma/migrations; then
+            echo "Migration is already committed."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add services/api/prisma/migrations
+          git commit -m "chore(data): commit initial production migration"
+          git push origin "HEAD:${GITHUB_HEAD_REF}"
+      - name: Apply migrations to the test database
+        run: npm run prisma:migrate:deploy -w @african-guard/api
       - name: Typecheck
         shell: bash
         run: |
