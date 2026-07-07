@@ -8,12 +8,13 @@ import { LiveIntegrationService } from "./live-integration.service";
 import { LiveOperationsService } from "./live-operations.service";
 import { LiveReadinessService } from "./live-readiness.service";
 import { LiveRiskScoringService } from "./live-risk-scoring.service";
+import { LiveStartupController } from "./live-startup.controller";
 import { LiveTransactionService } from "./live-transaction.service";
 import { LiveWebhookService } from "./live-webhook.service";
 import { OutboxDispatcherService } from "./outbox-dispatcher.service";
 
 @Module({
-  controllers: [LiveController],
+  controllers: [LiveController, LiveStartupController],
   providers: [
     PrismaService,
     ApiKeyService,
