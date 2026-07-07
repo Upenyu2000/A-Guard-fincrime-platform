@@ -6,7 +6,7 @@ import {
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { IS_PUBLIC_KEY } from "./public.decorator";
-import { AuthenticatedRequest } from "./auth.types";
+import { AuthenticatedPrincipal, AuthenticatedRequest } from "./auth.types";
 import { TokenVerifierService } from "./token-verifier.service";
 
 @Injectable()
@@ -26,7 +26,12 @@ export class JwtAuthGuard implements CanActivate {
       ]) ?? false;
     const isHealthCheck = route === "/v1/health" || route === "/v1/health/live";
     const isSignedWebhook = /^\/v1\/webhooks\/[^/]+$/u.test(route);
-    if (isExplicitlyPublic || isHealthCheck || isSignedWebhook) return true;
+
+    if (isExplicitlyPublic || isHealthCheck) {
+      request.user = this.publicPrincipal();
+      return true;
+    }
+    if (isSignedWebhook) return true;
 
     // Remove all caller-supplied compatibility identity headers before authentication.
     delete request.headers["x-role"];
@@ -51,5 +56,17 @@ export class JwtAuthGuard implements CanActivate {
     request.headers["x-role"] = principal.roles[0] ?? "analyst";
     request.headers["x-tenant-id"] = principal.tenantId;
     return true;
+  }
+
+  private publicPrincipal(): AuthenticatedPrincipal {
+    return {
+      subject: "public-health-check",
+      tenantId: "system",
+      roles: ["auditor"],
+      scopes: ["health.read"],
+      issuer: "african-guard-system",
+      audience: ["african-guard-api"],
+      authenticationMethods: ["public-endpoint"],
+    };
   }
 }
