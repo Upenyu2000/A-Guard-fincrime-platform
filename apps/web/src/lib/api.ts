@@ -174,13 +174,20 @@ export async function runAgentOpsCycle(): Promise<{
   action: AgentAction;
   controlPlane: AgentOpsControlPlane;
 }> {
-  return apiFetch("/v1/agentops/run-cycle", { method: "POST" });
+  return apiFetch<{
+    run: AgentRunResult;
+    action: AgentAction;
+    controlPlane: AgentOpsControlPlane;
+  }>("/v1/agentops/run-cycle", { method: "POST" });
 }
 
 export async function approveAgentAction(
   id: string,
 ): Promise<{ action: AgentAction; controlPlane: AgentOpsControlPlane }> {
-  return apiFetch(`/v1/agentops/actions/${encodeURIComponent(id)}/approve`, { method: "POST" });
+  return apiFetch<{ action: AgentAction; controlPlane: AgentOpsControlPlane }>(
+    `/v1/agentops/actions/${encodeURIComponent(id)}/approve`,
+    { method: "POST" },
+  );
 }
 
 export async function setAgentAutonomy(mode: AgentAutonomyMode): Promise<AgentOpsControlPlane> {
@@ -197,37 +204,43 @@ export async function fetchDeploymentReadiness(): Promise<DeploymentReadiness> {
 export async function testIntegration(
   id: string,
 ): Promise<{ integration: IntegrationConnection; result: string; checks: string[] }> {
-  return apiFetch(`/v1/integrations/${encodeURIComponent(id)}/test`, { method: "POST" });
+  return apiFetch<{ integration: IntegrationConnection; result: string; checks: string[] }>(
+    `/v1/integrations/${encodeURIComponent(id)}/test`,
+    { method: "POST" },
+  );
 }
 
 export async function ingestDemoTransaction(
   integrationId: string,
 ): Promise<{ record: TransactionMonitoringRecord; decision: RiskDecision }> {
   requireDemoMode("Demo transaction ingestion");
-  return apiFetch("/v1/transactions/ingest", {
-    method: "POST",
-    body: JSON.stringify({
-      integrationId,
-      amount: 42000,
-      currency: "USD",
-      customerId: `demo-customer-${crypto.randomUUID()}`,
-      merchantId: "mrc-demo",
-      deviceId: "dev-demo-shared",
-      ipAddress: "198.51.100.24",
-      beneficiaryId: "ben-demo",
-      signals: {
-        velocity_5m: 6,
-        device_reputation: 78,
-        device_fingerprint_reuse: 8,
-        bot_score: 84,
-        remote_access_tool: true,
-        session_entropy: 21,
-        beneficiary_risk: 81,
-        graph_risk: 77,
-        consortium_hits: 2,
-      },
-    }),
-  });
+  return apiFetch<{ record: TransactionMonitoringRecord; decision: RiskDecision }>(
+    "/v1/transactions/ingest",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        integrationId,
+        amount: 42000,
+        currency: "USD",
+        customerId: `demo-customer-${crypto.randomUUID()}`,
+        merchantId: "mrc-demo",
+        deviceId: "dev-demo-shared",
+        ipAddress: "198.51.100.24",
+        beneficiaryId: "ben-demo",
+        signals: {
+          velocity_5m: 6,
+          device_reputation: 78,
+          device_fingerprint_reuse: 8,
+          bot_score: 84,
+          remote_access_tool: true,
+          session_entropy: 21,
+          beneficiary_risk: 81,
+          graph_risk: 77,
+          consortium_hits: 2,
+        },
+      }),
+    },
+  );
 }
 
 export interface LawfulOsintSearchInput {
