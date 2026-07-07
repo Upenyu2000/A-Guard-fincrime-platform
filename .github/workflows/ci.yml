@@ -16,9 +16,24 @@ jobs:
   node:
     name: TypeScript build and tests
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: african_guard
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d african_guard"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
       DATABASE_URL: postgresql://ci:ci@localhost:5432/african_guard?schema=public
+      RUN_DATABASE_TESTS: "true"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -30,6 +45,8 @@ jobs:
         run: npm run prisma:validate -w @african-guard/api
       - name: Generate Prisma client
         run: npm run prisma:generate -w @african-guard/api
+      - name: Apply test database schema
+        run: npx prisma db push --schema services/api/prisma/schema.prisma --skip-generate
       - name: Typecheck
         shell: bash
         run: |
