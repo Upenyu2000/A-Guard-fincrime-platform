@@ -48,7 +48,7 @@ jobs:
       - name: Generate initial migration SQL
         run: >-
           npx prisma migrate diff --from-empty
-          --to-schema services/api/prisma/schema.prisma
+          --to-schema-datamodel services/api/prisma/schema.prisma
           --script > initial-migration.sql
       - name: Upload migration SQL
         uses: actions/upload-artifact@v4
