@@ -9,6 +9,7 @@ import { LiveOperationsService } from "./live-operations.service";
 import { LiveReadinessService } from "./live-readiness.service";
 import { LiveRiskScoringService } from "./live-risk-scoring.service";
 import { LiveTransactionService } from "./live-transaction.service";
+import { OutboxDispatcherService } from "./outbox-dispatcher.service";
 
 @Module({
   controllers: [LiveController],
@@ -22,6 +23,7 @@ import { LiveTransactionService } from "./live-transaction.service";
     LiveCaseService,
     LiveOperationsService,
     LiveReadinessService,
+    OutboxDispatcherService,
   ],
   exports: [PrismaService, ApiKeyService, AuditLogService, LiveReadinessService],
 })
