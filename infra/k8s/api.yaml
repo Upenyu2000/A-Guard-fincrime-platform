@@ -1,10 +1,22 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: african-guard-api
+  namespace: african-guard
+automountServiceAccountToken: false
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: african-guard-api
   namespace: african-guard
 spec:
-  replicas: 2
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: african-guard-api
@@ -13,15 +25,33 @@ spec:
       labels:
         app: african-guard-api
     spec:
+      serviceAccountName: african-guard-api
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: api
-          image: african-guard/api:0.1.0
+          image: african-guard/api:0.2.0
           imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 4000
+            - name: http
+              containerPort: 4000
           env:
+            - name: NODE_ENV
+              value: production
             - name: PORT
               value: "4000"
+            - name: OUTBOX_DISPATCH_ENABLED
+              value: "true"
+            - name: DEMO_MODE
+              value: "false"
+            - name: AI_DEMO_MODE
+              value: "false"
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
@@ -33,24 +63,83 @@ spec:
                   name: african-guard-secrets
                   key: redis-url
             - name: KAFKA_BROKERS
-              value: kafka:9092
-            - name: NEO4J_URI
-              value: bolt://neo4j:7687
+              valueFrom:
+                secretKeyRef:
+                  name: african-guard-secrets
+                  key: kafka-brokers
             - name: AI_SERVICE_URL
               value: http://african-guard-ai:8001
+            - name: OAUTH_ISSUER_URL
+              valueFrom:
+                secretKeyRef:
+                  name: african-guard-secrets
+                  key: oauth-issuer-url
+            - name: OAUTH_AUDIENCE
+              valueFrom:
+                secretKeyRef:
+                  name: african-guard-secrets
+                  key: oauth-audience
+            - name: CORS_ALLOWED_ORIGINS
+              valueFrom:
+                secretKeyRef:
+                  name: african-guard-secrets
+                  key: cors-allowed-origins
+            - name: ENCRYPTION_MASTER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: african-guard-secrets
+                  key: encryption-master-key
+            - name: ENCRYPTION_KEY_REF
+              valueFrom:
+                secretKeyRef:
+                  name: african-guard-secrets
+                  key: encryption-key-ref
+            - name: API_KEY_PEPPER
+              valueFrom:
+                secretKeyRef:
+                  name: african-guard-secrets
+                  key: api-key-pepper
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
+          startupProbe:
+            httpGet:
+              path: /v1/live/health/startup
+              port: http
+            failureThreshold: 30
+            periodSeconds: 5
+            timeoutSeconds: 3
           readinessProbe:
             httpGet:
-              path: /v1/health
-              port: 4000
-            initialDelaySeconds: 10
+              path: /v1/live/health/ready
+              port: http
             periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /v1/live/health/live
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
           resources:
             requests:
-              cpu: 250m
-              memory: 384Mi
+              cpu: 500m
+              memory: 512Mi
             limits:
-              cpu: "1"
-              memory: 768Mi
+              cpu: "2"
+              memory: 1Gi
+          volumeMounts:
+            - name: temporary
+              mountPath: /tmp
+      volumes:
+        - name: temporary
+          emptyDir:
+            sizeLimit: 256Mi
 ---
 apiVersion: v1
 kind: Service
@@ -63,4 +152,38 @@ spec:
   ports:
     - name: http
       port: 4000
-      targetPort: 4000
+      targetPort: http
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: african-guard-api
+  namespace: african-guard
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: african-guard-api
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: african-guard-api
+  namespace: african-guard
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: african-guard-api
+  minReplicas: 3
+  maxReplicas: 12
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 65
