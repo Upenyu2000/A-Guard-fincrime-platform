@@ -1,0 +1,8 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Documented non-secret vault reference in the environment template"
+paths = ['''(^|/)\.env\.example$''']
+regexTarget = "match"
+regexes = ['''ENCRYPTION_MASTER_KEY=""\nENCRYPTION_KEY_REF="vault://african-guard/keys/application/current"''']
