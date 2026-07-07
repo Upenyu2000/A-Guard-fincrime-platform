@@ -13,7 +13,7 @@ export class WebhookVerificationGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
-    const route = (request.originalUrl ?? request.url ?? "").split("?")[0];
+    const route = (request.originalUrl ?? request.url ?? "").split("?")[0] ?? "";
     const match = route.match(/^\/v1\/webhooks\/([^/]+)$/u);
     if (!match) return true;
 
