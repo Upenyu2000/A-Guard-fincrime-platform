@@ -9,7 +9,7 @@ import {
 } from "node:crypto";
 import { AuditEvent, UserRole } from "../../domain";
 
-interface EncryptedEnvelope {
+export interface EncryptedEnvelope {
   alg: "AES-256-GCM";
   keyRef: string;
   iv: string;
