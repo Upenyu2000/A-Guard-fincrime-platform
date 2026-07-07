@@ -17,6 +17,8 @@ jobs:
     name: TypeScript build and tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/african_guard?schema=public
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -24,6 +26,10 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Validate Prisma schema
+        run: npm run prisma:validate -w @african-guard/api
+      - name: Generate Prisma client
+        run: npm run prisma:generate -w @african-guard/api
       - name: Typecheck
         shell: bash
         run: |
