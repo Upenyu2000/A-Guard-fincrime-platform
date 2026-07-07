@@ -5,6 +5,7 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
+import { ApiKeyService } from "../api-key-service/api-key-service.service";
 import { IS_PUBLIC_KEY } from "./public.decorator";
 import { AuthenticatedPrincipal, AuthenticatedRequest } from "./auth.types";
 import { TokenVerifierService } from "./token-verifier.service";
@@ -14,6 +15,7 @@ export class JwtAuthGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly tokenVerifier: TokenVerifierService,
+    private readonly apiKeyService: ApiKeyService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -24,7 +26,10 @@ export class JwtAuthGuard implements CanActivate {
         context.getHandler(),
         context.getClass(),
       ]) ?? false;
-    const isHealthCheck = route === "/v1/health" || route === "/v1/health/live";
+    const isHealthCheck =
+      route === "/v1/health" ||
+      route === "/v1/health/live" ||
+      route === "/v1/live/health/live";
     const isSignedWebhook = /^\/v1\/webhooks\/[^/]+$/u.test(route);
 
     if (isExplicitlyPublic || isHealthCheck) {
@@ -38,24 +43,49 @@ export class JwtAuthGuard implements CanActivate {
     delete request.headers["x-actor"];
     delete request.headers["x-tenant-id"];
 
-    const authorization = request.headers.authorization;
-    const raw = Array.isArray(authorization) ? authorization[0] : authorization;
-    if (!raw?.startsWith("Bearer ")) {
-      throw new UnauthorizedException("A bearer access token is required.");
+    const authorizationValue = request.headers.authorization;
+    const authorization = Array.isArray(authorizationValue)
+      ? authorizationValue[0]
+      : authorizationValue;
+    const apiKeyHeaderValue = request.headers["x-api-key"];
+    const apiKeyHeader = Array.isArray(apiKeyHeaderValue)
+      ? apiKeyHeaderValue[0]
+      : apiKeyHeaderValue;
+
+    let principal: AuthenticatedPrincipal;
+    if (authorization?.startsWith("Bearer ")) {
+      const token = authorization.slice("Bearer ".length).trim();
+      if (!token) throw new UnauthorizedException("A bearer access token is required.");
+      principal = await this.tokenVerifier.verifyAccessToken(token);
+    } else {
+      const apiKey = authorization?.startsWith("ApiKey ")
+        ? authorization.slice("ApiKey ".length).trim()
+        : apiKeyHeader?.trim();
+      if (!apiKey) {
+        throw new UnauthorizedException(
+          "A bearer access token or scoped API key is required.",
+        );
+      }
+      principal = await this.apiKeyService.authenticate(
+        apiKey,
+        request.ip ?? request.socket?.remoteAddress,
+      );
     }
 
-    const token = raw.slice("Bearer ".length).trim();
-    if (!token) throw new UnauthorizedException("A bearer access token is required.");
-
-    const principal = await this.tokenVerifier.verifyAccessToken(token);
     request.user = principal;
+    this.attachLegacyCompatibilityContext(request, principal);
+    return true;
+  }
 
+  private attachLegacyCompatibilityContext(
+    request: AuthenticatedRequest,
+    principal: AuthenticatedPrincipal,
+  ): void {
     // Transitional compatibility for legacy controller methods. These values are server-derived
     // and overwrite anything supplied by the caller. New code must read request.user directly.
     request.headers["x-actor"] = principal.subject;
     request.headers["x-role"] = principal.roles[0] ?? "analyst";
     request.headers["x-tenant-id"] = principal.tenantId;
-    return true;
   }
 
   private publicPrincipal(): AuthenticatedPrincipal {
