@@ -29,8 +29,9 @@ export class JwtAuthGuard implements CanActivate {
     const isHealthCheck =
       route === "/v1/health" ||
       route === "/v1/health/live" ||
-      route === "/v1/live/health/live";
-    const isSignedWebhook = /^\/v1\/webhooks\/[^/]+$/u.test(route);
+      route === "/v1/live/health/live" ||
+      route === "/v1/live/health/ready";
+    const isSignedWebhook = /^\/v1\/(?:live\/)?webhooks\/[^/]+$/u.test(route);
 
     if (isExplicitlyPublic || isHealthCheck) {
       request.user = this.publicPrincipal();
@@ -38,7 +39,6 @@ export class JwtAuthGuard implements CanActivate {
     }
     if (isSignedWebhook) return true;
 
-    // Remove all caller-supplied compatibility identity headers before authentication.
     delete request.headers["x-role"];
     delete request.headers["x-actor"];
     delete request.headers["x-tenant-id"];
@@ -73,19 +73,10 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     request.user = principal;
-    this.attachLegacyCompatibilityContext(request, principal);
-    return true;
-  }
-
-  private attachLegacyCompatibilityContext(
-    request: AuthenticatedRequest,
-    principal: AuthenticatedPrincipal,
-  ): void {
-    // Transitional compatibility for legacy controller methods. These values are server-derived
-    // and overwrite anything supplied by the caller. New code must read request.user directly.
     request.headers["x-actor"] = principal.subject;
     request.headers["x-role"] = principal.roles[0] ?? "analyst";
     request.headers["x-tenant-id"] = principal.tenantId;
+    return true;
   }
 
   private publicPrincipal(): AuthenticatedPrincipal {
