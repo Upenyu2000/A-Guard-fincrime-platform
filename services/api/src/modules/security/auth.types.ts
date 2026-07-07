@@ -20,6 +20,8 @@ export interface AuthenticatedRequest {
   url?: string;
   originalUrl?: string;
   params?: Record<string, string | undefined>;
+  ip?: string;
+  socket?: { remoteAddress?: string };
 }
 
 export const supportedRoles: ReadonlySet<UserRole> = new Set<UserRole>([
