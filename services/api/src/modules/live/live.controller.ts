@@ -5,16 +5,18 @@ import {
   Headers,
   HttpCode,
   HttpStatus,
+  Param,
   Post,
   Query,
+  Req,
   ServiceUnavailableException,
 } from "@nestjs/common";
 import { AuditLogService } from "../audit-log-service/audit-log-service.service";
+import { AuthenticatedPrincipal, AuthenticatedRequest } from "../security/auth.types";
 import { CurrentPrincipal } from "../security/current-principal.decorator";
 import { Public } from "../security/public.decorator";
 import { Roles } from "../security/roles.decorator";
 import { Scopes } from "../security/scopes.decorator";
-import { AuthenticatedPrincipal } from "../security/auth.types";
 import {
   CreateLiveApiKeyDto,
   CreateLiveCaseDto,
@@ -24,6 +26,7 @@ import {
 } from "./live.dto";
 import { LiveOperationsService } from "./live-operations.service";
 import { LiveReadinessService } from "./live-readiness.service";
+import { LiveWebhookService } from "./live-webhook.service";
 
 @Controller("live")
 export class LiveController {
@@ -31,6 +34,7 @@ export class LiveController {
     private readonly operations: LiveOperationsService,
     private readonly readiness: LiveReadinessService,
     private readonly audit: AuditLogService,
+    private readonly webhooks: LiveWebhookService,
   ) {}
 
   @Get("health/live")
@@ -97,6 +101,28 @@ export class LiveController {
     @Headers("idempotency-key") idempotencyKey: string,
   ) {
     return this.operations.ingestTransaction(principal, body, idempotencyKey);
+  }
+
+  @Post("webhooks/:integrationId")
+  @HttpCode(HttpStatus.ACCEPTED)
+  @Roles("institution_partner")
+  @Scopes("webhooks.ingest")
+  receiveWebhook(
+    @Param("integrationId") integrationId: string,
+    @CurrentPrincipal() principal: AuthenticatedPrincipal,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    if (!request.rawBody) throw new ServiceUnavailableException("Raw webhook body is unavailable.");
+    const eventHeader = request.headers["x-webhook-event-id"];
+    const providerEventId = Array.isArray(eventHeader) ? eventHeader[0] : eventHeader;
+    if (!providerEventId) throw new ServiceUnavailableException("Verified webhook event ID is absent.");
+    return this.webhooks.receive({
+      principal,
+      integrationId,
+      providerEventId,
+      rawBody: request.rawBody,
+      payload: request.body ?? {},
+    });
   }
 
   @Get("cases")
