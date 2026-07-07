@@ -1,0 +1,11 @@
+FROM node:24-alpine
+WORKDIR /app
+ENV NODE_ENV=production
+COPY package.json package-lock.json ./
+COPY apps/web/package.json apps/web/package.json
+COPY services/api/package.json services/api/package.json
+RUN npm ci --ignore-scripts
+COPY services/api/prisma ./services/api/prisma
+RUN npx prisma generate --schema services/api/prisma/schema.prisma
+USER node
+ENTRYPOINT ["npx", "prisma", "migrate", "deploy", "--schema", "services/api/prisma/schema.prisma"]

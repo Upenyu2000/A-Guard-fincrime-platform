@@ -1,0 +1,154 @@
+name: Continuous Integration
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  node:
+    name: TypeScript build and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: african_guard
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d african_guard"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/african_guard?schema=public
+      RUN_DATABASE_TESTS: "true"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Validate Prisma schema
+        run: npm run prisma:validate -w @african-guard/api
+      - name: Generate Prisma client
+        run: npm run prisma:generate -w @african-guard/api
+      - name: Generate committed initial migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          migration_dir="services/api/prisma/migrations/20260707000000_initial_production_schema"
+          mkdir -p "$migration_dir"
+          npx prisma migrate diff --from-empty \
+            --to-schema-datamodel services/api/prisma/schema.prisma \
+            --script > "$migration_dir/migration.sql"
+          printf 'provider = "postgresql"\n' > services/api/prisma/migrations/migration_lock.toml
+      - name: Upload migration SQL
+        uses: actions/upload-artifact@v4
+        with:
+          name: initial-migration-sql
+          path: services/api/prisma/migrations
+          retention-days: 7
+      - name: Commit generated migration to the PR branch
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        shell: bash
+        run: |
+          if git diff --quiet -- services/api/prisma/migrations; then
+            echo "Migration is already committed."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add services/api/prisma/migrations
+          git commit -m "chore(data): commit initial production migration"
+          git push origin "HEAD:${GITHUB_HEAD_REF}"
+      - name: Apply migrations to the test database
+        run: npm run prisma:migrate:deploy -w @african-guard/api
+      - name: Typecheck
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run typecheck 2>&1 | tee typecheck.log
+      - name: Upload typecheck diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: typecheck-diagnostics
+          path: typecheck.log
+          if-no-files-found: ignore
+          retention-days: 7
+      - run: npm run build
+      - run: npm test
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=critical
+
+  python:
+    name: AI service tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      APP_ENV: test
+      AI_DEMO_MODE: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r services/ai/requirements.txt
+      - name: Run AI tests
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m unittest discover -s services/ai/tests -p "test_*.py" -v 2>&1 | tee python-tests.log
+      - name: Upload AI test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-test-diagnostics
+          path: python-tests.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+  secret-scan:
+    name: Secret scanning
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Scan the checked-out source tree
+        shell: bash
+        run: |
+          docker run --rm \
+            -v "$PWD:/repo" \
+            zricethezav/gitleaks:v8.28.0 \
+            detect --source=/repo --no-git --redact \
+            --config=/repo/.gitleaks.toml \
+            --report-format=json \
+            --report-path=/repo/gitleaks-report.json \
+            --exit-code=1
+      - name: Upload secret-scan report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-report
+          path: gitleaks-report.json
+          if-no-files-found: ignore
+          retention-days: 7

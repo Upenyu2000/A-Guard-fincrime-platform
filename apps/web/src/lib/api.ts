@@ -1,50 +1,108 @@
 import { fallbackPicture } from "./fallback";
-import { AgentAction, AgentAutonomyMode, AgentOpsControlPlane, AgentRunResult, DeploymentReadiness, IntegrationConnection, OperatingPicture, OsintFinding, OsintInvestigationResult, RiskDecision, TransactionMonitoringRecord } from "./types";
+import {
+  AgentAction,
+  AgentAutonomyMode,
+  AgentOpsControlPlane,
+  AgentRunResult,
+  DeploymentReadiness,
+  IntegrationConnection,
+  OperatingPicture,
+  OsintFinding,
+  OsintInvestigationResult,
+  RiskDecision,
+  TransactionMonitoringRecord,
+} from "./types";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 export const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? "http://localhost:4000";
+const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+const TOKEN_STORAGE_KEY = "african_guard_access_token";
+
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status?: number,
+    readonly responseBody?: unknown,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
+export function setAccessToken(token: string): void {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
+}
+
+export function clearAccessToken(): void {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+}
+
+export function getAccessToken(): string | undefined {
+  if (typeof window !== "undefined") {
+    return window.sessionStorage.getItem(TOKEN_STORAGE_KEY) ?? undefined;
+  }
+  return process.env.AFRICAN_GUARD_SERVER_ACCESS_TOKEN;
+}
+
+async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const token = getAccessToken();
+  if (!token) {
+    throw new ApiError("Not authenticated. Sign in through the configured identity provider.", 401);
+  }
+
+  const headers = new Headers(init.headers);
+  headers.set("authorization", `Bearer ${token}`);
+  if (init.body && !headers.has("content-type")) headers.set("content-type", "application/json");
+  const response = await fetch(`${API_URL}${path}`, {
+    ...init,
+    headers,
+    cache: init.cache ?? "no-store",
+  });
+
+  const contentType = response.headers.get("content-type") ?? "";
+  const responseBody = contentType.includes("application/json")
+    ? await response.json().catch(() => undefined)
+    : await response.text().catch(() => undefined);
+
+  if (!response.ok) {
+    throw new ApiError(`API request failed with status ${response.status}.`, response.status, responseBody);
+  }
+  return responseBody as T;
+}
+
+function requireDemoMode(action: string): void {
+  if (!DEMO_MODE) {
+    throw new ApiError(`${action} is available only when NEXT_PUBLIC_DEMO_MODE=true.`);
+  }
+}
 
 export async function fetchOperatingPicture(): Promise<OperatingPicture> {
   try {
-    const response = await fetch(`${API_URL}/v1/operating-picture`, {
-      cache: "no-store",
-      headers: { "x-role": "admin" },
-    });
-    if (!response.ok) throw new Error(`API returned ${response.status}`);
-    return (await response.json()) as OperatingPicture;
-  } catch {
-    return fallbackPicture;
+    return await apiFetch<OperatingPicture>("/v1/operating-picture");
+  } catch (error) {
+    if (DEMO_MODE) return fallbackPicture;
+    throw error;
   }
 }
 
 export async function recallPayment(id: string) {
-  const response = await fetch(`${API_URL}/v1/payments/${id}/recall`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-role": "fraud_investigator",
-      "x-actor": "console.user",
-    },
-  });
-  if (!response.ok) throw new Error(`Recall failed with ${response.status}`);
-  return response.json() as Promise<unknown>;
+  return apiFetch<unknown>(`/v1/payments/${encodeURIComponent(id)}/recall`, { method: "POST" });
 }
 
 export async function scoreSyntheticEvent(): Promise<RiskDecision> {
-  const response = await fetch(`${API_URL}/v1/events/score`, {
+  requireDemoMode("Synthetic scoring");
+  return apiFetch<RiskDecision>("/v1/events/score", {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-role": "analyst",
-    },
     body: JSON.stringify({
       event_type: "transaction",
-      user_id: `manual-${Math.round(Math.random() * 9000)}`,
-      institution_id: "inst-afb",
+      user_id: `manual-${crypto.randomUUID()}`,
+      institution_id: "inst-demo",
       amount: 128000,
       currency: "USD",
-      account_id: "acct-console",
-      device_id: "dev-console",
+      account_id: "acct-demo",
+      device_id: "dev-demo",
       country: "NG",
       channel: "mobile",
       signals: {
@@ -73,183 +131,145 @@ export async function scoreSyntheticEvent(): Promise<RiskDecision> {
       },
     }),
   });
-  if (!response.ok) throw new Error(`Scoring failed with ${response.status}`);
-  return response.json() as Promise<RiskDecision>;
 }
 
 export async function chatCase(caseId: string, prompt: string) {
-  const response = await fetch(`${API_URL}/v1/cases/${caseId}/chat`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-role": "fraud_investigator",
-    },
-    body: JSON.stringify({ prompt }),
-  });
-  if (!response.ok) throw new Error(`Chat failed with ${response.status}`);
-  return response.json() as Promise<{ answer: string; citations: string[] }>;
+  return apiFetch<{ answer: string; citations: string[] }>(
+    `/v1/cases/${encodeURIComponent(caseId)}/chat`,
+    { method: "POST", body: JSON.stringify({ prompt }) },
+  );
 }
 
 export async function submitFeedback(caseId: string, label: string) {
-  const response = await fetch(`${API_URL}/v1/learning/feedback`, {
+  return apiFetch<unknown>("/v1/learning/feedback", {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-role": "analyst",
-    },
     body: JSON.stringify({
       caseId,
       label,
-      analyst: "console.user",
-      notes: "Label submitted from African Guard operating console.",
+      notes: "Label submitted from the African Guard operating console.",
     }),
   });
-  if (!response.ok) throw new Error(`Feedback failed with ${response.status}`);
-  return response.json() as Promise<unknown>;
 }
 
-export async function runAgent(prompt: string, agentId?: string, entityName?: string): Promise<AgentRunResult> {
-  const response = await fetch(`${API_URL}/v1/agents/run`, {
+export async function runAgent(
+  prompt: string,
+  agentId?: string,
+  entityName?: string,
+): Promise<AgentRunResult> {
+  return apiFetch<AgentRunResult>("/v1/agents/run", {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-role": "fraud_investigator",
-    },
     body: JSON.stringify({ prompt, agentId, entityName }),
   });
-  if (!response.ok) throw new Error(`Agent run failed with ${response.status}`);
-  return response.json() as Promise<AgentRunResult>;
 }
 
-export async function osintSearch(entityName: string): Promise<OsintFinding> {
-  const response = await fetch(`${API_URL}/v1/agents/osint`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-role": "compliance_officer",
-    },
-    body: JSON.stringify({ entityName }),
-  });
-  if (!response.ok) throw new Error(`OSINT search failed with ${response.status}`);
-  return response.json() as Promise<OsintFinding>;
+export async function osintSearch(_entityName: string): Promise<OsintFinding> {
+  throw new ApiError(
+    "The legacy OSINT endpoint is disabled. Use a governed identity search with an active case, lawful basis, purpose, and approved sources.",
+    410,
+  );
 }
 
-export async function runAgentOpsCycle(): Promise<{ run: AgentRunResult; action: AgentAction; controlPlane: AgentOpsControlPlane }> {
-  const response = await fetch(`${API_URL}/v1/agentops/run-cycle`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-role": "fraud_investigator",
-      "x-actor": "console.user",
-    },
-  });
-  if (!response.ok) throw new Error(`AgentOps cycle failed with ${response.status}`);
-  return response.json() as Promise<{ run: AgentRunResult; action: AgentAction; controlPlane: AgentOpsControlPlane }>;
+export async function runAgentOpsCycle(): Promise<{
+  run: AgentRunResult;
+  action: AgentAction;
+  controlPlane: AgentOpsControlPlane;
+}> {
+  return apiFetch<{
+    run: AgentRunResult;
+    action: AgentAction;
+    controlPlane: AgentOpsControlPlane;
+  }>("/v1/agentops/run-cycle", { method: "POST" });
 }
 
-export async function approveAgentAction(id: string): Promise<{ action: AgentAction; controlPlane: AgentOpsControlPlane }> {
-  const response = await fetch(`${API_URL}/v1/agentops/actions/${id}/approve`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-role": "fraud_investigator",
-      "x-actor": "console.user",
-    },
-  });
-  if (!response.ok) throw new Error(`Agent action approval failed with ${response.status}`);
-  return response.json() as Promise<{ action: AgentAction; controlPlane: AgentOpsControlPlane }>;
+export async function approveAgentAction(
+  id: string,
+): Promise<{ action: AgentAction; controlPlane: AgentOpsControlPlane }> {
+  return apiFetch<{ action: AgentAction; controlPlane: AgentOpsControlPlane }>(
+    `/v1/agentops/actions/${encodeURIComponent(id)}/approve`,
+    { method: "POST" },
+  );
 }
 
 export async function setAgentAutonomy(mode: AgentAutonomyMode): Promise<AgentOpsControlPlane> {
-  const response = await fetch(`${API_URL}/v1/agentops/autonomy`, {
+  return apiFetch<AgentOpsControlPlane>("/v1/agentops/autonomy", {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-role": "admin",
-      "x-actor": "console.admin",
-    },
     body: JSON.stringify({ mode }),
   });
-  if (!response.ok) throw new Error(`Autonomy update failed with ${response.status}`);
-  return response.json() as Promise<AgentOpsControlPlane>;
 }
 
 export async function fetchDeploymentReadiness(): Promise<DeploymentReadiness> {
-  const response = await fetch(`${API_URL}/v1/deployment/readiness`, {
-    cache: "no-store",
-  });
-  if (!response.ok) throw new Error(`Readiness check failed with ${response.status}`);
-  return response.json() as Promise<DeploymentReadiness>;
+  return apiFetch<DeploymentReadiness>("/v1/deployment/readiness");
 }
 
-export async function testIntegration(id: string): Promise<{ integration: IntegrationConnection; result: string; checks: string[] }> {
-  const response = await fetch(`${API_URL}/v1/integrations/${id}/test`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-role": "developer",
-      "x-actor": "console.developer",
-    },
-  });
-  if (!response.ok) throw new Error(`Integration test failed with ${response.status}`);
-  return response.json() as Promise<{ integration: IntegrationConnection; result: string; checks: string[] }>;
+export async function testIntegration(
+  id: string,
+): Promise<{ integration: IntegrationConnection; result: string; checks: string[] }> {
+  return apiFetch<{ integration: IntegrationConnection; result: string; checks: string[] }>(
+    `/v1/integrations/${encodeURIComponent(id)}/test`,
+    { method: "POST" },
+  );
 }
 
-export async function ingestDemoTransaction(integrationId: string): Promise<{ record: TransactionMonitoringRecord; decision: RiskDecision }> {
-  const response = await fetch(`${API_URL}/v1/transactions/ingest`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-role": "developer",
+export async function ingestDemoTransaction(
+  integrationId: string,
+): Promise<{ record: TransactionMonitoringRecord; decision: RiskDecision }> {
+  requireDemoMode("Demo transaction ingestion");
+  return apiFetch<{ record: TransactionMonitoringRecord; decision: RiskDecision }>(
+    "/v1/transactions/ingest",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        integrationId,
+        amount: 42000,
+        currency: "USD",
+        customerId: `demo-customer-${crypto.randomUUID()}`,
+        merchantId: "mrc-demo",
+        deviceId: "dev-demo-shared",
+        ipAddress: "198.51.100.24",
+        beneficiaryId: "ben-demo",
+        signals: {
+          velocity_5m: 6,
+          device_reputation: 78,
+          device_fingerprint_reuse: 8,
+          bot_score: 84,
+          remote_access_tool: true,
+          session_entropy: 21,
+          beneficiary_risk: 81,
+          graph_risk: 77,
+          consortium_hits: 2,
+        },
+      }),
     },
-    body: JSON.stringify({
-      integrationId,
-      amount: 42000,
-      currency: "USD",
-      customerId: `demo-customer-${Math.round(Math.random() * 9999)}`,
-      merchantId: "mrc-velo-184",
-      deviceId: "dev-shared-019",
-      ipAddress: "198.51.100.24",
-      beneficiaryId: "ben-mule-7731",
-      signals: {
-        velocity_5m: 6,
-        device_reputation: 78,
-        device_fingerprint_reuse: 8,
-        bot_score: 84,
-        remote_access_tool: true,
-        session_entropy: 21,
-        beneficiary_risk: 81,
-        graph_risk: 77,
-        consortium_hits: 2,
-      },
-    }),
+  );
+}
+
+export interface LawfulOsintSearchInput {
+  caseId: string;
+  lawfulBasis: string;
+  purpose: string;
+  permissionLevel: "standard" | "enhanced" | "supervised";
+  query: Record<string, unknown>;
+}
+
+export async function runGovernedOsintSearch(
+  input: LawfulOsintSearchInput,
+): Promise<OsintInvestigationResult> {
+  return apiFetch<OsintInvestigationResult>("/v1/osint/identity-search", {
+    method: "POST",
+    body: JSON.stringify(input),
   });
-  if (!response.ok) throw new Error(`Transaction ingest failed with ${response.status}`);
-  return response.json() as Promise<{ record: TransactionMonitoringRecord; decision: RiskDecision }>;
 }
 
 export async function runLawfulOsintSearch(): Promise<OsintInvestigationResult> {
-  const response = await fetch(`${API_URL}/v1/osint/identity-search`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-role": "investigator",
-      "x-actor": "console.investigator",
+  requireDemoMode("Sandbox OSINT search");
+  return runGovernedOsintSearch({
+    caseId: "sandbox-case-osint-001",
+    lawfulBasis: "Synthetic sandbox training exercise",
+    purpose: "Validate the governed OSINT workflow using synthetic data only.",
+    permissionLevel: "standard",
+    query: {
+      name: "Synthetic Subject 001",
+      employerOrBusiness: "Synthetic Merchant Ltd",
     },
-    body: JSON.stringify({
-      tenantId: "tenant-civic-benefits",
-      caseId: "case-2051",
-      investigatorId: "usr-access-investigator",
-      lawfulBasis: "Public task and fraud prevention investigation",
-      purpose: "Verify declared identity and possible undeclared business association for an open case.",
-      permissionLevel: "enhanced",
-      query: {
-        name: "Amina K.",
-        email: "email_hash_39da",
-        employerOrBusiness: "Northstar Skins",
-      },
-    }),
   });
-  if (!response.ok) throw new Error(`OSINT search failed with ${response.status}`);
-  return response.json() as Promise<OsintInvestigationResult>;
 }
