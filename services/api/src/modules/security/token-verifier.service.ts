@@ -31,8 +31,15 @@ interface JwtPayload {
   realm_access?: { roles?: string[] };
 }
 
+interface SigningJwk {
+  [key: string]: string | undefined;
+  kid?: string;
+  alg?: string;
+  use?: string;
+}
+
 interface JsonWebKeySet {
-  keys: Array<JsonWebKey & { kid?: string; alg?: string; use?: string }>;
+  keys: SigningJwk[];
 }
 
 interface CachedJwks {
