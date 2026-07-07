@@ -32,6 +32,15 @@ export class WebhookVerificationGuard implements CanActivate {
 
     request.headers["x-webhook-verified"] = "true";
     request.headers["x-webhook-event-id"] = verification.eventId;
+    request.user = {
+      subject: `verified-webhook:${integrationId}`,
+      tenantId: `integration:${integrationId}`,
+      roles: ["institution_partner"],
+      scopes: ["webhooks.ingest"],
+      issuer: "african-guard-webhook-verifier",
+      audience: ["african-guard-api"],
+      authenticationMethods: ["hmac-sha256"],
+    };
     return true;
   }
 
