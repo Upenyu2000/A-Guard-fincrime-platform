@@ -41,12 +41,171 @@ enum PaymentStatus {
   IN_FLIGHT
   HELD
   FLAGGED
+  RECALL_REQUESTED
+  PROVIDER_ACKNOWLEDGED
   RECALLED
   COMPLETED
+  FAILED
+  RECONCILED
+}
+
+enum IntegrationStatus {
+  DRAFT
+  TESTING
+  CONNECTED
+  DEGRADED
+  FAILED
+  PAUSED
+}
+
+enum ApiKeyStatus {
+  ACTIVE
+  ROTATING
+  REVOKED
+  EXPIRED
+}
+
+enum ProcessingStatus {
+  RECEIVED
+  VALIDATED
+  PROCESSING
+  PROCESSED
+  QUARANTINED
+  FAILED
+}
+
+enum MembershipStatus {
+  ACTIVE
+  SUSPENDED
+  REVOKED
+}
+
+enum AuditOutcome {
+  SUCCESS
+  DENIED
+  FAILURE
+}
+
+enum OutboxStatus {
+  PENDING
+  PUBLISHED
+  FAILED
+}
+
+enum EvidenceQuality {
+  CONFIRMED
+  PROBABLE
+  POSSIBLE
+  NEEDS_VERIFICATION
+}
+
+enum ConsentStatus {
+  PENDING
+  ACTIVE
+  EXPIRED
+  REVOKED
+  FAILED
+}
+
+enum RuleLifecycleStatus {
+  DRAFT
+  BACKTESTED
+  REVIEWED
+  SANDBOX
+  SHADOW
+  CANARY
+  PRODUCTION
+  RETIRED
+}
+
+enum ModelLifecycleStatus {
+  DRAFT
+  VALIDATED
+  APPROVED
+  SHADOW
+  CANARY
+  PRODUCTION
+  RETIRED
+  REJECTED
+}
+
+model Tenant {
+  id               String   @id
+  name             String
+  type             String
+  country          String
+  status           String
+  isolationKey     String   @unique
+  mfaRequired      Boolean  @default(true)
+  retentionDays    Int
+  dataRegion       String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  memberships      TenantMembership[]
+  institutions     Institution[]
+  fraudEvents      FraudEvent[]
+  alerts           Alert[]
+  cases            Case[]
+  payments         Payment[]
+  graphEntities    GraphEntity[]
+  graphEdges       GraphEdge[]
+  learningFeedback LearningFeedback[]
+  auditLogs        AuditLog[]
+  integrations     IntegrationConnection[]
+  apiKeys          DeveloperApiKey[]
+  transactions     TransactionMonitor[]
+  riskAssessments  RiskAssessment[]
+  evidence         EvidenceCapture[]
+  osintSearches    OsintSearch[]
+  rawEvents        RawIngestionEvent[]
+  webhookEvents    WebhookEvent[]
+  idempotency      IdempotencyRecord[]
+  outboxEvents     OutboxEvent[]
+  consents         OpenBankingConsent[]
+  ruleVersions     RuleVersion[]
+  modelVersions    ModelVersion[]
+
+  @@index([status])
+  @@index([country])
+}
+
+model User {
+  id              String   @id @default(cuid())
+  externalSubject String   @unique
+  email           String?
+  displayName     String?
+  status          String   @default("active")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  memberships TenantMembership[]
+
+  @@index([email])
+  @@index([status])
+}
+
+model TenantMembership {
+  id        String           @id @default(cuid())
+  tenantId  String
+  userId    String
+  roles     Json
+  scopes    Json
+  status    MembershipStatus @default(ACTIVE)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, userId])
+  @@index([tenantId, status])
+  @@index([userId, status])
 }
 
 model Institution {
   id             String   @id @default(cuid())
+  tenantId       String
   name           String
   country        String
   trustScore     Int
@@ -54,208 +213,555 @@ model Institution {
   encryptedKeyId String
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
-  alerts         Alert[]
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  alerts      Alert[]
+  fraudEvents FraudEvent[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, country])
 }
 
 model FraudEvent {
-  id                String    @id
-  type              EventType
-  subjectHash       String
-  amount            Decimal?
-  currency          String?
-  riskScore         Int
-  riskLevel         RiskLevel
-  decision          Decision
-  reasons           Json
-  componentScores   Json
-  latencyMs         Int
-  institutionId     String?
-  createdAt         DateTime  @default(now())
-  alert             Alert?
+  id              String    @id @default(cuid())
+  tenantId        String
+  externalEventId String?
+  type            EventType
+  subjectHash     String
+  amount          Decimal?  @db.Decimal(20, 6)
+  currency        String?   @db.Char(3)
+  riskScore       Int
+  riskLevel       RiskLevel
+  decision        Decision
+  reasons         Json
+  componentScores Json
+  latencyMs       Int
+  institutionId   String?
+  createdAt       DateTime  @default(now())
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  institution Institution? @relation(fields: [institutionId], references: [id], onDelete: Restrict)
+  alert       Alert?
+
+  @@unique([tenantId, externalEventId])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, riskLevel, createdAt])
+  @@index([tenantId, subjectHash])
 }
 
 model Alert {
-  id            String      @id
-  eventId       String      @unique
-  event         FraudEvent  @relation(fields: [eventId], references: [id])
+  id            String     @id @default(cuid())
+  tenantId      String
+  eventId       String     @unique
   institutionId String?
-  institution   Institution? @relation(fields: [institutionId], references: [id])
   title         String
   severity      RiskLevel
   route         Json
-  createdAt     DateTime    @default(now())
-  case          Case?
+  createdAt     DateTime   @default(now())
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  event       FraudEvent   @relation(fields: [eventId], references: [id], onDelete: Restrict)
+  institution Institution? @relation(fields: [institutionId], references: [id], onDelete: Restrict)
+  case        Case?
+
+  @@index([tenantId, severity, createdAt])
 }
 
 model Case {
-  id          String     @id
-  alertId     String?    @unique
-  alert       Alert?     @relation(fields: [alertId], references: [id])
-  title       String
-  assignee    String
-  status      CaseStatus @default(NEW)
-  priority    RiskLevel
-  timeline    Json
-  evidence    Json
-  sarDraft    String?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id                String     @id @default(cuid())
+  tenantId          String
+  alertId           String?    @unique
+  title             String
+  assigneeSubject   String?
+  status            CaseStatus @default(NEW)
+  priority          RiskLevel
+  lossExposure      Decimal    @default(0) @db.Decimal(20, 6)
+  recoveryPotential Decimal    @default(0) @db.Decimal(20, 6)
+  timeline          Json       @default("[]")
+  evidence          Json       @default("[]")
+  sarDraft          String?
+  version           Int        @default(1)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  alert            Alert?            @relation(fields: [alertId], references: [id], onDelete: Restrict)
+  evidenceCaptures EvidenceCapture[]
+  osintSearches    OsintSearch[]
+  transactions     CaseTransaction[]
+
+  @@index([tenantId, status, priority])
+  @@index([tenantId, assigneeSubject, status])
+  @@index([tenantId, createdAt])
 }
 
 model Payment {
-  id              String        @id
-  amount          Decimal
-  currency        String
+  id              String        @id @default(cuid())
+  tenantId        String
+  externalId      String?
+  amount          Decimal       @db.Decimal(20, 6)
+  currency        String        @db.Char(3)
   origin          String
   destination     String
   status          PaymentStatus
   recallAvailable Boolean       @default(false)
   route           Json
   riskSignals     Json
+  version         Int           @default(1)
+  createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
+
+  tenant Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  events PaymentEvent[]
+
+  @@unique([tenantId, externalId])
+  @@index([tenantId, status, updatedAt])
+}
+
+model PaymentEvent {
+  id                    String        @id @default(cuid())
+  paymentId             String
+  status                PaymentStatus
+  providerEventId       String?
+  providerAcknowledged  Boolean       @default(false)
+  amount                Decimal?      @db.Decimal(20, 6)
+  currency              String?       @db.Char(3)
+  details               Json
+  occurredAt            DateTime
+  recordedAt            DateTime      @default(now())
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+
+  @@unique([paymentId, providerEventId])
+  @@index([paymentId, occurredAt])
 }
 
 model GraphEntity {
-  id        String   @id
+  id        String   @id @default(cuid())
+  tenantId  String
   type      String
   label     String
   risk      Int
   metadata  Json
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, type, risk])
+  @@index([tenantId, label])
 }
 
 model GraphEdge {
-  id        String   @id
-  sourceId  String
-  targetId  String
-  type      String
-  weight    Float
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  tenantId   String
+  sourceId   String
+  targetId   String
+  type       String
+  weight     Float
+  confidence Float    @default(0)
+  provenance Json
+  validFrom  DateTime?
+  validTo    DateTime?
+  createdAt  DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, sourceId, targetId, type])
+  @@index([tenantId, sourceId])
+  @@index([tenantId, targetId])
 }
 
 model LearningFeedback {
-  id          String   @id @default(cuid())
-  caseId      String
-  label       String
-  analyst     String
-  notes       String
-  featureHash String
-  createdAt   DateTime @default(now())
+  id              String   @id @default(cuid())
+  tenantId        String
+  caseId          String
+  label           String
+  analystSubject  String
+  reviewerSubject String?
+  notes           String
+  featureHash     String
+  evidenceRefs    Json
+  status          String   @default("pending_review")
+  createdAt       DateTime @default(now())
+  reviewedAt      DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, caseId])
 }
 
 model AuditLog {
-  id        String   @id @default(cuid())
-  actor     String
-  role      String
-  action    String
-  target    String
-  metadata  Json
-  createdAt DateTime @default(now())
-}
+  id            String       @id @default(cuid())
+  tenantId      String
+  actor         String
+  role          String
+  action        String
+  target        String
+  outcome       AuditOutcome @default(SUCCESS)
+  requestId     String?
+  correlationId String?
+  traceId       String?
+  metadata      Json
+  previousHash  String?
+  recordHash    String       @unique
+  createdAt     DateTime     @default(now())
 
-model Tenant {
-  id            String   @id
-  name          String
-  type          String
-  country       String
-  status        String
-  isolationKey  String   @unique
-  mfaRequired   Boolean  @default(true)
-  retentionDays Int
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, actor, createdAt])
+  @@index([tenantId, action, createdAt])
 }
 
 model IntegrationConnection {
-  id                         String   @id
-  tenantId                   String
-  name                       String
-  type                       String
-  adapterId                  String
-  environment                String
-  authMethods                Json
-  status                     String
-  scopes                     Json
-  encryptedCredentialRef     String
-  credentialFingerprint      String
-  fieldMappings              Json
-  webhook                    Json?
-  lastSyncAt                 DateTime?
-  lastSuccessfulSyncAt       DateTime?
-  dataVolume24h              Int      @default(0)
-  totalTransactionsIngested  Int      @default(0)
-  rateLimitPerMinute         Int
-  retryPolicy                String
-  errors                     Json
-  createdAt                  DateTime @default(now())
-  updatedAt                  DateTime @updatedAt
+  id                        String            @id @default(cuid())
+  tenantId                  String
+  name                      String
+  type                      String
+  provider                  String
+  adapterId                 String
+  environment               String
+  authMethods               Json
+  status                    IntegrationStatus @default(DRAFT)
+  scopes                    Json
+  encryptedCredentialRef    String
+  credentialFingerprint     String
+  fieldMappings             Json
+  webhook                   Json?
+  lastSyncAt                DateTime?
+  lastSuccessfulSyncAt      DateTime?
+  dataVolume24h             Int               @default(0)
+  totalTransactionsIngested BigInt            @default(0)
+  rateLimitPerMinute        Int
+  retryPolicy               String
+  errors                    Json
+  version                   Int               @default(1)
+  createdAt                 DateTime          @default(now())
+  updatedAt                 DateTime          @updatedAt
+
+  tenant        Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  transactions  TransactionMonitor[]
+  rawEvents     RawIngestionEvent[]
+  webhookEvents WebhookEvent[]
+  consents      OpenBankingConsent[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, status])
+  @@index([tenantId, type, environment])
 }
 
 model DeveloperApiKey {
-  id          String   @id
+  id          String       @id @default(cuid())
   tenantId    String
   name        String
   prefix      String
-  fingerprint String   @unique
+  secretHash  String       @unique
+  fingerprint String       @unique
   scopes      Json
-  status      String
+  status      ApiKeyStatus @default(ACTIVE)
+  allowedIps  Json
   lastUsedAt  DateTime?
   expiresAt   DateTime?
-  createdAt   DateTime @default(now())
+  revokedAt   DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, status])
+  @@index([prefix])
+}
+
+model RawIngestionEvent {
+  id              String           @id @default(cuid())
+  tenantId        String
+  integrationId   String
+  externalEventId String
+  schemaVersion   String
+  eventType       String
+  eventAt         DateTime
+  receivedAt      DateTime         @default(now())
+  payloadRef      String?
+  payloadHash     String
+  canonicalHash   String?
+  status          ProcessingStatus @default(RECEIVED)
+  failureCode     String?
+  failureDetail   String?
+  retryCount      Int              @default(0)
+  processedAt     DateTime?
+
+  tenant      Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  integration IntegrationConnection @relation(fields: [integrationId], references: [id], onDelete: Restrict)
+
+  @@unique([integrationId, externalEventId])
+  @@index([tenantId, status, receivedAt])
+  @@index([integrationId, receivedAt])
 }
 
 model TransactionMonitor {
-  id                  String   @id
-  tenantId            String
-  sourceIntegrationId String
-  rail                String
-  eventType           String
-  amount              Decimal
-  currency            String
-  status              String
-  customerId          String
-  accountId           String?
-  cardId              String?
-  merchantId          String?
-  deviceId            String?
-  ipAddress           String?
-  beneficiaryId       String?
-  riskScore           Int
-  riskLevel           RiskLevel
-  decision            Decision
-  reasons             Json
-  explainability      Json
-  caseId              String?
-  ingestedAt          DateTime
-  processedAt         DateTime
+  id                    String           @id @default(cuid())
+  tenantId              String
+  sourceIntegrationId   String
+  externalTransactionId String
+  schemaVersion         String
+  rail                  String
+  eventType             String
+  amount                Decimal          @db.Decimal(20, 6)
+  currency              String           @db.Char(3)
+  originalAmount        Decimal?         @db.Decimal(20, 6)
+  originalCurrency      String?          @db.Char(3)
+  fxRate                Decimal?         @db.Decimal(24, 12)
+  fxRateAt              DateTime?
+  status                ProcessingStatus @default(RECEIVED)
+  customerId            String
+  accountId             String?
+  cardId                String?
+  merchantId            String?
+  deviceId              String?
+  ipAddress             String?
+  beneficiaryId         String?
+  riskScore             Int?
+  riskLevel             RiskLevel?
+  decision              Decision?
+  reasons               Json?
+  explainability        Json?
+  modelVersion          String?
+  policyVersion         String?
+  eventAt               DateTime
+  ingestedAt            DateTime         @default(now())
+  processedAt           DateTime?
+  version               Int              @default(1)
+
+  tenant          Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  integration     IntegrationConnection @relation(fields: [sourceIntegrationId], references: [id], onDelete: Restrict)
+  riskAssessments RiskAssessment[]
+  cases           CaseTransaction[]
+
+  @@unique([sourceIntegrationId, externalTransactionId])
+  @@index([tenantId, ingestedAt])
+  @@index([tenantId, riskLevel, status])
+  @@index([tenantId, customerId, eventAt])
+  @@index([tenantId, accountId, eventAt])
+  @@index([tenantId, merchantId, eventAt])
+}
+
+model RiskAssessment {
+  id              String    @id @default(cuid())
+  tenantId        String
+  transactionId   String
+  modelVersion    String
+  featureVersion  String
+  policyVersion   String
+  score           Int
+  level           RiskLevel
+  recommendation Decision
+  finalDecision   Decision
+  confidence      Float?
+  componentScores Json
+  reasons         Json
+  explainability  Json
+  evaluatedAt     DateTime  @default(now())
+
+  tenant      Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  transaction TransactionMonitor @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, evaluatedAt])
+  @@index([transactionId, evaluatedAt])
+  @@index([tenantId, level, evaluatedAt])
+}
+
+model CaseTransaction {
+  caseId        String
+  transactionId String
+  linkedAt      DateTime @default(now())
+  linkReason    String
+
+  case        Case               @relation(fields: [caseId], references: [id], onDelete: Restrict)
+  transaction TransactionMonitor @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+
+  @@id([caseId, transactionId])
+  @@index([transactionId])
 }
 
 model EvidenceCapture {
-  id                 String   @id
+  id                 String          @id @default(cuid())
   tenantId           String
   caseId             String
   type               String
   title              String
+  objectKey          String
   sourceUrl          String?
-  hash               String
+  contentHash        String
   capturedBy         String
+  mimeType           String
+  sizeBytes          BigInt
   chainOfCustody     Json
-  quality            String
+  quality            EvidenceQuality
+  immutable          Boolean         @default(true)
+  legalHold          Boolean         @default(false)
   retentionExpiresAt DateTime
-  capturedAt         DateTime @default(now())
+  capturedAt         DateTime        @default(now())
+
+  tenant            Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  investigationCase Case   @relation(fields: [caseId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, caseId, capturedAt])
+  @@index([tenantId, retentionExpiresAt])
+  @@unique([tenantId, contentHash])
 }
 
 model OsintSearch {
-  id              String   @id
-  tenantId        String
-  caseId          String
-  investigatorId  String
-  lawfulBasis     String
-  purpose         String
-  permissionLevel String
-  query           Json
-  sourcesQueried  Json
-  matches         Json
-  safeguards      Json
-  searchedAt      DateTime @default(now())
+  id                 String   @id @default(cuid())
+  tenantId           String
+  caseId             String
+  investigatorId     String
+  lawfulBasis        String
+  purpose            String
+  permissionLevel    String
+  query              Json
+  sourcesQueried     Json
+  matches            Json
+  safeguards         Json
+  approvalReference  String?
+  retentionExpiresAt DateTime
+  searchedAt         DateTime @default(now())
+
+  tenant            Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  investigationCase Case   @relation(fields: [caseId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, caseId, searchedAt])
+  @@index([tenantId, investigatorId, searchedAt])
+}
+
+model WebhookEvent {
+  id                String           @id @default(cuid())
+  tenantId          String
+  integrationId     String
+  providerEventId   String
+  signatureVerified Boolean
+  payloadHash       String
+  payloadRef        String?
+  status            ProcessingStatus @default(RECEIVED)
+  receivedAt        DateTime         @default(now())
+  processedAt       DateTime?
+  failureCode       String?
+
+  tenant      Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  integration IntegrationConnection @relation(fields: [integrationId], references: [id], onDelete: Restrict)
+
+  @@unique([integrationId, providerEventId])
+  @@index([tenantId, status, receivedAt])
+}
+
+model IdempotencyRecord {
+  id           String   @id @default(cuid())
+  tenantId     String
+  operation    String
+  key          String
+  requestHash  String
+  responseCode Int?
+  responseBody Json?
+  lockedUntil  DateTime?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  completedAt  DateTime?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, operation, key])
+  @@index([tenantId, expiresAt])
+}
+
+model OutboxEvent {
+  id            String       @id @default(cuid())
+  tenantId      String
+  topic         String
+  eventKey      String
+  eventType     String
+  schemaVersion String
+  payload       Json
+  headers       Json
+  status        OutboxStatus @default(PENDING)
+  attempts      Int          @default(0)
+  availableAt   DateTime     @default(now())
+  publishedAt   DateTime?
+  lastError     String?
+  createdAt     DateTime     @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@index([status, availableAt])
+  @@index([tenantId, createdAt])
+}
+
+model OpenBankingConsent {
+  id                String        @id @default(cuid())
+  tenantId          String
+  integrationId     String
+  providerConsentId String
+  customerToken     String
+  scopes            Json
+  status            ConsentStatus @default(PENDING)
+  authorisedAt      DateTime?
+  expiresAt         DateTime?
+  revokedAt         DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  tenant      Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  integration IntegrationConnection @relation(fields: [integrationId], references: [id], onDelete: Restrict)
+
+  @@unique([integrationId, providerConsentId])
+  @@index([tenantId, status, expiresAt])
+}
+
+model RuleVersion {
+  id                 String              @id @default(cuid())
+  tenantId           String
+  ruleKey            String
+  version            Int
+  name               String
+  expression         String
+  status             RuleLifecycleStatus @default(DRAFT)
+  jurisdiction       String?
+  expectedAlertRate  Float?
+  actualAlertRate    Float?
+  falsePositiveRate  Float?
+  backtestResults    Json?
+  authorSubject      String
+  approverSubjects   Json
+  effectiveFrom      DateTime?
+  effectiveTo        DateTime?
+  rollbackVersion    Int?
+  createdAt          DateTime            @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, ruleKey, version])
+  @@index([tenantId, status, createdAt])
+}
+
+model ModelVersion {
+  id                  String               @id @default(cuid())
+  tenantId            String
+  modelKey             String
+  version              String
+  algorithm            String
+  featureSchemaVersion String
+  artifactUri          String
+  artifactSha256       String
+  status               ModelLifecycleStatus @default(DRAFT)
+  evaluationMetrics    Json
+  trainingLineage      Json
+  approvedBy           Json
+  effectiveFrom        DateTime?
+  effectiveTo          DateTime?
+  createdAt            DateTime             @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, modelKey, version])
+  @@index([tenantId, status, createdAt])
 }
