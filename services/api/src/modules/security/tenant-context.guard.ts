@@ -13,8 +13,8 @@ export class TenantContextGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const route = (request.originalUrl ?? request.url ?? "").split("?")[0] ?? "";
 
-    if (route === "/v1/health" || route === "/v1/health/live") return true;
-    if (/^\/v1\/webhooks\/[^/]+$/u.test(route)) return true;
+    if (route.includes("/health/")) return true;
+    if (/^\/v1\/(?:live\/)?webhooks\/[^/]+$/u.test(route)) return true;
 
     if (route === "/v1/agents/osint") {
       throw new GoneException(
@@ -23,8 +23,7 @@ export class TenantContextGuard implements CanActivate {
     }
 
     const principal = request.user;
-    if (!principal) return true; // JwtAuthGuard produces the authoritative 401 response.
-
+    if (!principal) return true;
     const body = request.body;
     if (!body || typeof body !== "object") return true;
 
@@ -35,13 +34,10 @@ export class TenantContextGuard implements CanActivate {
       );
     }
 
-    // Legacy handlers accept these fields in request bodies. Overwrite them with verified claims
-    // until those handlers are replaced by typed DTOs and tenant-scoped repositories.
     if ("tenantId" in body) body.tenantId = principal.tenantId;
     if ("investigatorId" in body) body.investigatorId = principal.subject;
     if ("capturedBy" in body) body.capturedBy = principal.subject;
     if ("analyst" in body) body.analyst = principal.subject;
-
     return true;
   }
 }
