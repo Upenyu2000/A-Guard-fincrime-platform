@@ -6,9 +6,9 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 import { MembershipStatus, Prisma } from "@prisma/client";
+import { UserRole } from "../../domain";
 import { PrismaService } from "../database/prisma.service";
 import { AuthenticatedRequest, supportedRoles } from "./auth.types";
-import { UserRole } from "../../domain";
 
 @Injectable()
 export class PersistentTenantGuard implements CanActivate {
@@ -35,7 +35,12 @@ export class PersistentTenantGuard implements CanActivate {
         throw new ForbiddenException("The authenticated tenant is not active.");
       }
 
-      if (principal.authenticationMethods.includes("api-key")) return true;
+      if (
+        principal.authenticationMethods.includes("api-key") ||
+        principal.authenticationMethods.includes("signed-webhook")
+      ) {
+        return true;
+      }
 
       const user = await this.prisma.user.findUnique({
         where: { externalSubject: principal.subject },
@@ -80,7 +85,9 @@ export class PersistentTenantGuard implements CanActivate {
   }
 
   private stringArray(value: Prisma.JsonValue): string[] {
-    return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+    return Array.isArray(value)
+      ? value.filter((item): item is string => typeof item === "string")
+      : [];
   }
 
   private intersectScopes(tokenScopes: string[], membershipScopes: string[]): string[] {
