@@ -18,7 +18,7 @@ export class JwtAuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
-    const route = (request.originalUrl ?? request.url ?? "").split("?")[0];
+    const route = (request.originalUrl ?? request.url ?? "").split("?")[0] ?? "";
     const isExplicitlyPublic =
       this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
         context.getHandler(),
