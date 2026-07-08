@@ -28,6 +28,8 @@ import {
   Sparkles,
   Users,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import Link from "next/link";
 import { AgenticOpsPanel } from "./AgenticOpsPanel";
 import {
   chatCase,
@@ -67,6 +69,35 @@ const riskDot: Record<RiskLevel, string> = {
   critical: "bg-fuchsia-400",
 };
 
+export type OperatingConsoleSection =
+  | "command"
+  | "alerts"
+  | "payments"
+  | "graph"
+  | "cases"
+  | "copilot"
+  | "agents"
+  | "learning"
+  | "security";
+
+const moduleLinks: Array<{
+  section: OperatingConsoleSection | "aml";
+  label: string;
+  href: string;
+  description: string;
+  icon: LucideIcon;
+}> = [
+  { section: "alerts", label: "Alert stream", href: "/alerts", description: "Real-time risk heatmap, severity distribution, and alert queue.", icon: Bell },
+  { section: "payments", label: "Payment tracking", href: "/payments", description: "Stop, recall, and route high-risk payments.", icon: CreditCard },
+  { section: "graph", label: "Identity graph", href: "/graph", description: "Fraud-ring relationships, consortium intelligence, and typologies.", icon: GitBranch },
+  { section: "cases", label: "Cases", href: "/cases", description: "Investigation workspace, exposure, recovery, timeline, and evidence.", icon: FileWarning },
+  { section: "copilot", label: "Copilot", href: "/copilot", description: "AI-assisted case explanation, entity linking, and SAR drafting prompts.", icon: Bot },
+  { section: "agents", label: "Agents", href: "/agents", description: "Agentic fraud and AML workflows, prompt library, merchant risk, and enablement.", icon: Sparkles },
+  { section: "aml", label: "AML workspace", href: "/aml", description: "Dedicated AML, KYC, KYB, screening, SAR, and transaction-governance workspace.", icon: Landmark },
+  { section: "learning", label: "AI learning", href: "/learning", description: "Feedback queue, drift, false-positive rate, and model lift.", icon: Brain },
+  { section: "security", label: "Security", href: "/security", description: "Audit stream, controls, RBAC, rate limiting, and envelope protection.", icon: LockKeyhole },
+];
+
 function timeAgo(value: string) {
   const seconds = Math.max(1, Math.floor((Date.now() - new Date(value).getTime()) / 1000));
   if (seconds < 60) return `${seconds}s`;
@@ -75,7 +106,7 @@ function timeAgo(value: string) {
   return `${Math.floor(minutes / 60)}h`;
 }
 
-export function OperatingConsole() {
+export function OperatingConsole({ section = "command" }: { section?: OperatingConsoleSection }) {
   const queryClient = useQueryClient();
   const { picture, connected, setPicture, setConnected, pushAlert, setLastDecisionScore, lastDecisionScore } =
     useGuardStore();
@@ -129,32 +160,133 @@ export function OperatingConsole() {
             scoring={scorer.isPending}
             lastDecisionScore={lastDecisionScore}
           />
-          <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(380px,0.55fr)]">
-            <div className="min-w-0 space-y-4">
-              <MetricStrip picture={current} />
-              <AgenticOpsPanel picture={current} />
-              <div className="grid gap-4 2xl:grid-cols-[minmax(0,0.95fr)_minmax(360px,0.55fr)]">
-                <LiveOperations picture={current} />
-                <PaymentTracking picture={current} />
-              </div>
-              <div className="grid gap-4 2xl:grid-cols-[minmax(0,0.9fr)_minmax(420px,0.6fr)]">
-                <IdentityGraph picture={current} />
-                <NetworkIntelligence picture={current} />
-              </div>
-              <div className="grid gap-4 xl:grid-cols-2">
-                <AmlConvergence picture={current} />
-                <LearningSystem picture={current} />
-              </div>
-            </div>
-            <div className="min-w-0 space-y-4">
-              <CaseWorkspace picture={current} />
-              <CopilotPanel picture={current} />
-              <AuditPanel picture={current} />
-            </div>
-          </div>
+          <OperatingSection section={section} picture={current} />
         </section>
       </div>
     </main>
+  );
+}
+
+function OperatingSection({ section, picture }: { section: OperatingConsoleSection; picture: OperatingPicture }) {
+  switch (section) {
+    case "alerts":
+      return (
+        <PageShell eyebrow="Alert stream" title="Real-time fraud command">
+          <LiveOperations picture={picture} />
+        </PageShell>
+      );
+    case "payments":
+      return (
+        <PageShell eyebrow="Payment tracking" title="Stop, recall, route">
+          <PaymentTracking picture={picture} />
+        </PageShell>
+      );
+    case "graph":
+      return (
+        <PageShell eyebrow="Graph intelligence" title="Risk propagation and consortium intelligence">
+          <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_minmax(420px,0.62fr)]">
+            <IdentityGraph picture={picture} />
+            <NetworkIntelligence picture={picture} />
+          </div>
+        </PageShell>
+      );
+    case "cases":
+      return (
+        <PageShell eyebrow="Case management" title="Investigation workspace">
+          <CaseWorkspace picture={picture} />
+        </PageShell>
+      );
+    case "copilot":
+      return (
+        <PageShell eyebrow="AI investigation" title="Fraud copilot">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,0.72fr)_minmax(380px,0.5fr)]">
+            <CopilotPanel picture={picture} />
+            <CaseWorkspace picture={picture} />
+          </div>
+        </PageShell>
+      );
+    case "agents":
+      return (
+        <PageShell eyebrow="Agentic risk operations" title="Agents, prompt library, merchant monitoring, disputes, and enablement">
+          <AgenticOpsPanel picture={picture} />
+        </PageShell>
+      );
+    case "learning":
+      return (
+        <PageShell eyebrow="AI learning" title="Feedback and drift">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,0.7fr)_minmax(420px,0.55fr)]">
+            <LearningSystem picture={picture} />
+            <AmlConvergence picture={picture} />
+          </div>
+        </PageShell>
+      );
+    case "security":
+      return (
+        <PageShell eyebrow="Security" title="Audit and controls">
+          <AuditPanel picture={picture} />
+        </PageShell>
+      );
+    case "command":
+    default:
+      return (
+        <PageShell eyebrow="Command center" title="Operating overview">
+          <MetricStrip picture={picture} />
+          <CommandOverview picture={picture} />
+        </PageShell>
+      );
+  }
+}
+
+function PageShell({ eyebrow, title, children }: { eyebrow: string; title: string; children: ReactNode }) {
+  return (
+    <div className="mt-4 space-y-4">
+      <div className="rounded-lg border border-white/10 bg-white/[0.035] p-4">
+        <p className="text-xs uppercase tracking-[0.16em] text-guard-teal">{eyebrow}</p>
+        <h2 className="mt-1 text-xl font-semibold text-white">{title}</h2>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function CommandOverview({ picture }: { picture: OperatingPicture }) {
+  const selectedCase = picture.cases[0];
+  const moduleStats: Record<string, string> = {
+    alerts: `${picture.alerts.length} live alerts`,
+    payments: `${picture.payments.length} tracked payments`,
+    graph: `${picture.graph.nodes.length} graph entities`,
+    cases: `${picture.cases.length} investigations`,
+    copilot: selectedCase?.id ?? "No selected case",
+    agents: `${picture.agenticOperations.agents.length} agents`,
+    aml: `${picture.amlCustomers.length} unified profiles`,
+    learning: `Drift ${picture.learning.driftIndex.toFixed(2)}`,
+    security: `${picture.audit.length} audit events`,
+  };
+
+  return (
+    <section className="panel p-4">
+      <SectionHeader icon={Gauge} eyebrow="Command modules" title="Open a focused workspace" />
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {moduleLinks.map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className="group rounded-lg border border-white/10 bg-white/[0.035] p-4 transition hover:border-fuchsia-300/35 hover:bg-white/[0.065]"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-white">{item.label}</p>
+                <p className="mt-1 text-xs text-white/45">{moduleStats[item.section] ?? "Open workspace"}</p>
+              </div>
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/[0.06] text-white/70 group-hover:text-fuchsia-100">
+                <item.icon className="h-4 w-4" aria-hidden />
+              </div>
+            </div>
+            <p className="mt-3 text-xs leading-5 text-white/52">{item.description}</p>
+          </Link>
+        ))}
+      </div>
+    </section>
   );
 }
 

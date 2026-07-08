@@ -2,17 +2,20 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, Bot, Brain, CreditCard, Gauge, GitBranch, Landmark, LockKeyhole, Shield } from "lucide-react";
+import { Bell, Bot, Brain, CreditCard, FileWarning, Gauge, GitBranch, Landmark, LockKeyhole, Shield, Sparkles } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 const items = [
   { icon: Gauge, label: "Command", href: "/" },
-  { icon: Bell, label: "Alerts" },
-  { icon: CreditCard, label: "Payments" },
-  { icon: GitBranch, label: "Graph" },
-  { icon: Bot, label: "Copilot" },
-  { icon: Brain, label: "Agents" },
+  { icon: Bell, label: "Alerts", href: "/alerts" },
+  { icon: CreditCard, label: "Payments", href: "/payments" },
+  { icon: GitBranch, label: "Graph", href: "/graph" },
+  { icon: FileWarning, label: "Cases", href: "/cases" },
+  { icon: Bot, label: "Copilot", href: "/copilot" },
+  { icon: Sparkles, label: "Agents", href: "/agents" },
   { icon: Landmark, label: "AML", href: "/aml" },
-  { icon: LockKeyhole, label: "Security" },
+  { icon: Brain, label: "Learning", href: "/learning" },
+  { icon: LockKeyhole, label: "Security", href: "/security" },
 ];
 
 export function AppNavigation({ connected }: { connected: boolean }) {
@@ -28,7 +31,7 @@ export function AppNavigation({ connected }: { connected: boolean }) {
             </div>
             <nav className="space-y-2" aria-label="Primary">
               {items.map((item) => (
-                <NavItem key={item.label} item={item} active={item.href === pathname} />
+                <NavItem key={item.label} item={item} active={isActive(pathname, item.href)} />
               ))}
             </nav>
           </div>
@@ -40,15 +43,20 @@ export function AppNavigation({ connected }: { connected: boolean }) {
       </aside>
 
       <nav
-        className="glass fixed bottom-3 left-3 right-3 z-50 grid grid-cols-4 gap-1 rounded-lg p-2 lg:hidden"
+        className="glass fixed bottom-3 left-3 right-3 z-50 flex gap-1 overflow-x-auto rounded-lg p-2 lg:hidden"
         aria-label="Mobile primary"
       >
-        {items.filter((item) => item.href).map((item) => (
-          <NavItem key={item.label} item={item} active={item.href === pathname} mobile />
+        {items.map((item) => (
+          <NavItem key={item.label} item={item} active={isActive(pathname, item.href)} mobile />
         ))}
       </nav>
     </>
   );
+}
+
+function isActive(pathname: string, href: string) {
+  if (href === "/") return pathname === "/";
+  return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 function NavItem({
@@ -56,31 +64,22 @@ function NavItem({
   active,
   mobile = false,
 }: {
-  item: { icon: typeof Shield; label: string; href?: string };
+  item: { icon: LucideIcon; label: string; href: string };
   active: boolean;
   mobile?: boolean;
 }) {
   const className = `${
-    mobile ? "flex h-11 flex-col items-center justify-center gap-1 text-[10px]" : "grid h-12 w-12 place-items-center"
+    mobile ? "flex h-11 min-w-16 flex-col items-center justify-center gap-1 px-2 text-[10px]" : "grid h-12 w-12 place-items-center"
   } rounded-lg border transition ${
     active
       ? "border-fuchsia-300/45 bg-fuchsia-400/16 text-white"
       : "border-white/10 bg-white/[0.04] text-white/70 hover:border-fuchsia-300/40 hover:bg-white/10 hover:text-white"
   }`;
 
-  if (item.href) {
-    return (
-      <Link href={item.href} className={className} title={item.label} aria-label={item.label} aria-current={active ? "page" : undefined}>
-        <item.icon className="h-5 w-5" aria-hidden />
-        {mobile ? <span>{item.label}</span> : null}
-      </Link>
-    );
-  }
-
   return (
-    <button type="button" className={className} title={`${item.label} is available in the command console`} aria-label={item.label}>
+    <Link href={item.href} className={className} title={item.label} aria-label={item.label} aria-current={active ? "page" : undefined}>
       <item.icon className="h-5 w-5" aria-hidden />
       {mobile ? <span>{item.label}</span> : null}
-    </button>
+    </Link>
   );
 }
