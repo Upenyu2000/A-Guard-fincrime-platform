@@ -6,6 +6,7 @@ import {
   AgentRunResult,
   AgenticOperations,
   AmlCustomerRisk,
+  AmlKycMandate,
   AuditEvent,
   CaseStatus,
   DisputeEvidence,
@@ -39,6 +40,7 @@ import {
   agentCapabilities as seedAgentCapabilities,
   alerts as seedAlerts,
   amlCustomers as seedAmlCustomers,
+  amlKycMandate as seedAmlKycMandate,
   audit as seedAudit,
   cases as seedCases,
   demoVideo as seedDemoVideo,
@@ -78,6 +80,7 @@ export class DataStoreService {
   private readonly graphEdges: GraphEdge[] = structuredClone(seedGraphEdges);
   private readonly heatmap: HeatmapPoint[] = structuredClone(seedHeatmap);
   private readonly amlCustomers: AmlCustomerRisk[] = structuredClone(seedAmlCustomers);
+  private readonly amlKycMandate: AmlKycMandate = structuredClone(seedAmlKycMandate);
   private readonly audit: AuditEvent[] = structuredClone(seedAudit);
   private readonly metrics: OperatingMetrics = structuredClone(seedMetrics);
   private readonly learning: LearningState = structuredClone(seedLearning);
@@ -98,6 +101,8 @@ export class DataStoreService {
   constructor(private readonly security: SecurityService) {}
 
   operatingPicture(): OperatingPicture {
+    const graph = this.graphSnapshot();
+
     return {
       metrics: { ...this.metrics },
       alerts: this.alerts.slice(0, 12),
@@ -106,12 +111,10 @@ export class DataStoreService {
       institutions: this.institutions,
       typologies: this.typologies,
       heatmap: this.heatmap,
-      graph: {
-        nodes: this.graphNodes,
-        edges: this.graphEdges,
-      },
+      graph,
       riskDistribution: this.riskDistribution(),
       amlCustomers: this.amlCustomers,
+      amlKycMandate: this.amlKycMandate,
       learning: { ...this.learning },
       audit: this.audit.slice(0, 12),
       agenticOperations: this.agenticOperations(),
@@ -647,37 +650,122 @@ export class DataStoreService {
     point.risk = Math.round(point.risk * 0.82 + score * 0.18);
   }
 
+  private graphDisplayKey(node: Pick<GraphNode, "type" | "label">) {
+    return `${node.type}:${node.label.trim().toLowerCase()}`;
+  }
+
+  private findGraphNode(type: GraphNode["type"], id: string, label: string) {
+    return (
+      this.graphNodes.find((node) => node.id === id) ??
+      this.graphNodes.find((node) => this.graphDisplayKey(node) === this.graphDisplayKey({ type, label }))
+    );
+  }
+
+  private upsertGraphEdge(
+    source: string,
+    target: string,
+    relationship: GraphEdge["relationship"],
+    weight: number,
+  ) {
+    if (source === target) return;
+    const existing = this.graphEdges.find(
+      (edge) => edge.source === source && edge.target === target && edge.relationship === relationship,
+    );
+
+    if (existing) {
+      existing.weight = Math.max(existing.weight, weight);
+      return;
+    }
+
+    this.graphEdges.push({
+      id: `edge-${randomUUID().slice(0, 8)}`,
+      source,
+      target,
+      relationship,
+      weight,
+    });
+  }
+
+  private graphSnapshot() {
+    const nodesByKey = new Map<string, GraphNode>();
+    const retainedIdById = new Map<string, string>();
+
+    for (const node of this.graphNodes) {
+      const key = this.graphDisplayKey(node);
+      const existing = nodesByKey.get(key);
+      if (!existing) {
+        nodesByKey.set(key, { ...node });
+        retainedIdById.set(node.id, node.id);
+        continue;
+      }
+
+      existing.risk = Math.max(existing.risk, node.risk);
+      retainedIdById.set(node.id, existing.id);
+    }
+
+    const edgesByKey = new Map<string, GraphEdge>();
+    for (const edge of this.graphEdges) {
+      const source = retainedIdById.get(edge.source);
+      const target = retainedIdById.get(edge.target);
+      if (!source || !target || source === target) continue;
+
+      const key = `${source}:${target}:${edge.relationship}`;
+      const existing = edgesByKey.get(key);
+      if (existing) {
+        existing.weight = Math.max(existing.weight, edge.weight);
+        continue;
+      }
+
+      edgesByKey.set(key, { ...edge, source, target });
+    }
+
+    return {
+      nodes: [...nodesByKey.values()],
+      edges: [...edgesByKey.values()],
+    };
+  }
+
   private updateGraph(event: FraudEventInput, decision: RiskDecision, subjectHash: string) {
-    const existingNode = this.graphNodes.find((node) => node.id === subjectHash);
-    if (!existingNode) {
-      this.graphNodes.push({
+    let subjectNode = this.findGraphNode("user", subjectHash, "User hash");
+    if (!subjectNode) {
+      subjectNode = {
         id: subjectHash,
         type: "user",
         label: "User hash",
         risk: decision.risk_score,
         x: 20 + Math.random() * 60,
         y: 20 + Math.random() * 60,
-      });
+      };
+      this.graphNodes.push(subjectNode);
     } else {
-      existingNode.risk = Math.round(existingNode.risk * 0.7 + decision.risk_score * 0.3);
+      subjectNode.risk = Math.round(subjectNode.risk * 0.7 + decision.risk_score * 0.3);
     }
 
-    if (event.device_id && !this.graphNodes.find((node) => node.id === event.device_id)) {
-      this.graphNodes.push({
-        id: event.device_id,
-        type: "device",
-        label: "Device hash",
-        risk: decision.component_scores.behavioural_profile,
-        x: 20 + Math.random() * 60,
-        y: 20 + Math.random() * 60,
-      });
-      this.graphEdges.push({
-        id: `edge-${randomUUID().slice(0, 8)}`,
-        source: subjectHash,
-        target: event.device_id,
-        relationship: "used_on",
-        weight: decision.component_scores.behavioural_profile / 100,
-      });
+    if (event.device_id) {
+      const deviceLabel = event.device_id === "dev_a4fd" ? "Device A4FD" : "Device hash";
+      let deviceNode = this.findGraphNode("device", event.device_id, deviceLabel);
+      if (!deviceNode) {
+        deviceNode = {
+          id: event.device_id,
+          type: "device",
+          label: deviceLabel,
+          risk: decision.component_scores.behavioural_profile,
+          x: 20 + Math.random() * 60,
+          y: 20 + Math.random() * 60,
+        };
+        this.graphNodes.push(deviceNode);
+      } else {
+        deviceNode.risk = Math.round(
+          deviceNode.risk * 0.7 + decision.component_scores.behavioural_profile * 0.3,
+        );
+      }
+
+      this.upsertGraphEdge(
+        subjectNode.id,
+        deviceNode.id,
+        "used_on",
+        decision.component_scores.behavioural_profile / 100,
+      );
     }
   }
 

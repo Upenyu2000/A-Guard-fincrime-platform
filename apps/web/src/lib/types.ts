@@ -152,6 +152,27 @@ export interface AmlCustomerRisk {
   drivers: string[];
 }
 
+export interface AmlKycMandate {
+  title: string;
+  summary: string;
+  definitions: Array<{
+    term: string;
+    description: string;
+  }>;
+  process: Array<{
+    id: string;
+    name: string;
+    controls: string[];
+  }>;
+  regulations: Array<{
+    name: string;
+    role: string;
+  }>;
+  launderingStages: string[];
+  programPillars: string[];
+  consequences: string[];
+}
+
 export interface LearningState {
   modelVersion: string;
   lastRetrainedAt: string;
@@ -398,6 +419,7 @@ export interface OperatingPicture {
     color: string;
   }>;
   amlCustomers: AmlCustomerRisk[];
+  amlKycMandate: AmlKycMandate;
   learning: LearningState;
   audit: AuditEvent[];
   agenticOperations: AgenticOperations;

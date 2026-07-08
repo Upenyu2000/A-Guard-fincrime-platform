@@ -3,6 +3,7 @@ import {
   AgentRunResult,
   Alert,
   AmlCustomerRisk,
+  AmlKycMandate,
   AuditEvent,
   DemoVideo,
   DisputeEvidence,
@@ -380,6 +381,82 @@ export const amlCustomers: AmlCustomerRisk[] = [
     drivers: ["refund loop", "merchant graph", "cash-out pattern"],
   },
 ];
+
+export const amlKycMandate: AmlKycMandate = {
+  title: "AML and KYC fund operations mandate",
+  summary:
+    "Private funds need a risk-based AML program that verifies every investor, screens ownership and sanctions exposure, and monitors investor activity through the fund lifecycle.",
+  definitions: [
+    {
+      term: "Money laundering",
+      description:
+        "Illicit proceeds are placed, layered through complex transactions, and integrated back into the financial system as apparently legitimate assets.",
+    },
+    {
+      term: "AML",
+      description:
+        "The full control framework for detecting, preventing, escalating, and reporting suspicious financial activity.",
+    },
+    {
+      term: "KYC",
+      description:
+        "The identity verification and risk assessment process that supplies the data needed for customer due diligence.",
+    },
+  ],
+  process: [
+    {
+      id: "cip",
+      name: "Customer identification program",
+      controls: [
+        "Collect legal name, physical address, date of birth for individuals, and government or tax identifier.",
+        "Verify investor information during subscription before capital is accepted.",
+      ],
+    },
+    {
+      id: "cdd",
+      name: "Customer due diligence",
+      controls: [
+        "Screen investors, beneficial owners, and control persons against sanctions, watchlists, PEP, and adverse-media sources.",
+        "Document the purpose of the relationship and maintain a risk profile for each LP or entity.",
+      ],
+    },
+    {
+      id: "edd",
+      name: "Enhanced due diligence",
+      controls: [
+        "Escalate PEPs, high-risk jurisdictions, opaque ownership structures, and sanctions-adjacent exposure.",
+        "Collect source-of-wealth, source-of-funds, and ownership evidence before approval.",
+      ],
+    },
+    {
+      id: "monitoring",
+      name: "Continuous monitoring",
+      controls: [
+        "Rescreen LPs and related parties as lists and risk profiles change.",
+        "Trigger alerts for suspicious transactions, ownership changes, or new adverse media.",
+      ],
+    },
+  ],
+  regulations: [
+    { name: "Bank Secrecy Act", role: "Foundation for U.S. AML reporting and recordkeeping obligations." },
+    { name: "USA PATRIOT Act", role: "Expanded AML controls and terrorist-financing safeguards." },
+    { name: "FinCEN", role: "Primary U.S. administrator for AML rules and suspicious activity reporting." },
+    { name: "OFAC", role: "Administers sanctions screening and enforcement exposure." },
+    { name: "FATF", role: "Sets global AML and counter-terrorist-financing standards." },
+  ],
+  launderingStages: ["Placement", "Layering", "Integration"],
+  programPillars: [
+    "Designated compliance owner",
+    "Written internal controls",
+    "Ongoing employee training",
+    "Independent testing or audit",
+  ],
+  consequences: [
+    "Regulatory fines and sanctions enforcement",
+    "Criminal exposure for willful non-compliance",
+    "Loss of banking, LP, and counterparty confidence",
+  ],
+};
 
 export const learning: LearningState = {
   modelVersion: "hybrid-risk-2026.07",

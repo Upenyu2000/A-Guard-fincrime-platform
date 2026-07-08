@@ -141,6 +141,31 @@ export const fallbackPicture: OperatingPicture = {
     { customerId: "cust-9041", name: "Corporate remitter hash", fraudRisk: 91, amlRisk: 82, sanctionsRisk: 37, unifiedRisk: 86, riskLevel: "critical", drivers: ["layering route", "mule beneficiary", "high value burst"] },
     { customerId: "cust-2290", name: "Retail wallet hash", fraudRisk: 77, amlRisk: 53, sanctionsRisk: 12, unifiedRisk: 68, riskLevel: "high", drivers: ["ATO indicators", "new device", "rapid beneficiary update"] },
   ],
+  amlKycMandate: {
+    title: "AML and KYC fund operations mandate",
+    summary: "Private funds need a risk-based AML program that verifies every investor, screens ownership and sanctions exposure, and monitors investor activity through the fund lifecycle.",
+    definitions: [
+      { term: "Money laundering", description: "Illicit proceeds are placed, layered through complex transactions, and integrated back into the financial system as apparently legitimate assets." },
+      { term: "AML", description: "The control framework for detecting, preventing, escalating, and reporting suspicious financial activity." },
+      { term: "KYC", description: "Identity verification and risk assessment that feeds customer due diligence." },
+    ],
+    process: [
+      { id: "cip", name: "Customer identification program", controls: ["Collect legal name, address, DOB for individuals, and government or tax identifier.", "Verify investor information during subscription before capital is accepted."] },
+      { id: "cdd", name: "Customer due diligence", controls: ["Screen investors, beneficial owners, and control persons against sanctions, PEP, watchlist, and adverse-media sources.", "Document the purpose of the relationship and maintain a risk profile."] },
+      { id: "edd", name: "Enhanced due diligence", controls: ["Escalate PEPs, high-risk jurisdictions, opaque ownership, and sanctions-adjacent exposure.", "Collect source-of-wealth, source-of-funds, and ownership evidence."] },
+      { id: "monitoring", name: "Continuous monitoring", controls: ["Rescreen LPs and related parties as lists and risk profiles change.", "Trigger alerts for suspicious transactions, ownership changes, or adverse media."] },
+    ],
+    regulations: [
+      { name: "Bank Secrecy Act", role: "Foundation for U.S. AML reporting and recordkeeping." },
+      { name: "USA PATRIOT Act", role: "Expanded AML and terrorist-financing safeguards." },
+      { name: "FinCEN", role: "Administers AML rules and suspicious activity reporting." },
+      { name: "OFAC", role: "Administers sanctions screening and enforcement." },
+      { name: "FATF", role: "Sets global AML and counter-terrorist-financing standards." },
+    ],
+    launderingStages: ["Placement", "Layering", "Integration"],
+    programPillars: ["Designated compliance owner", "Written internal controls", "Ongoing employee training", "Independent testing or audit"],
+    consequences: ["Regulatory fines and sanctions enforcement", "Criminal exposure for willful non-compliance", "Loss of banking, LP, and counterparty confidence"],
+  },
   learning: {
     modelVersion: "hybrid-risk-2026.07",
     lastRetrainedAt: iso(1560),

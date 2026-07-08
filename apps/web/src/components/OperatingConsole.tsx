@@ -803,7 +803,83 @@ function AmlConvergence({ picture }: { picture: OperatingPicture }) {
           </div>
         ))}
       </div>
+      <AmlKycMandateCard mandate={picture.amlKycMandate} />
     </section>
+  );
+}
+
+function AmlKycMandateCard({ mandate }: { mandate: OperatingPicture["amlKycMandate"] }) {
+  return (
+    <div className="mt-4 rounded-lg border border-white/10 bg-[#0b0c19]/74 p-3">
+      <div>
+        <p className="text-xs uppercase tracking-[0.14em] text-white/38">Fund operations mandate</p>
+        <h3 className="mt-1 text-sm font-semibold text-white">{mandate.title}</h3>
+        <p className="mt-2 text-xs leading-5 text-white/56">{mandate.summary}</p>
+      </div>
+
+      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+        {mandate.definitions.map((item) => (
+          <div key={item.term} className="rounded-md border border-white/10 bg-white/[0.035] p-2">
+            <p className="text-xs font-medium text-white">{item.term}</p>
+            <p className="mt-1 text-[11px] leading-5 text-white/50">{item.description}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-3 grid gap-2">
+        {mandate.process.map((stage, index) => (
+          <div key={stage.id} className="rounded-md border border-white/10 bg-black/18 p-2">
+            <div className="flex items-center gap-2">
+              <span className="grid h-5 w-5 shrink-0 place-items-center rounded-md border border-fuchsia-300/25 bg-fuchsia-400/10 text-[10px] text-fuchsia-100">
+                {index + 1}
+              </span>
+              <p className="min-w-0 text-xs font-medium text-white">{stage.name}</p>
+            </div>
+            <div className="mt-2 grid gap-1.5">
+              {stage.controls.map((control) => (
+                <div key={control} className="flex gap-2 text-[11px] leading-5 text-white/52">
+                  <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-200" aria-hidden />
+                  <span>{control}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {mandate.regulations.map((regulation) => (
+          <span
+            key={regulation.name}
+            className="rounded-md border border-cyan-300/20 bg-cyan-400/10 px-2 py-1 text-[11px] text-cyan-100"
+            title={regulation.role}
+          >
+            {regulation.name}
+          </span>
+        ))}
+      </div>
+
+      <div className="mt-3 grid gap-2 md:grid-cols-3">
+        <AmlMandateList title="Laundering stages" items={mandate.launderingStages} />
+        <AmlMandateList title="Program pillars" items={mandate.programPillars} />
+        <AmlMandateList title="Consequences" items={mandate.consequences} />
+      </div>
+    </div>
+  );
+}
+
+function AmlMandateList({ title, items }: { title: string; items: string[] }) {
+  return (
+    <div className="rounded-md border border-white/10 bg-white/[0.035] p-2">
+      <p className="text-[10px] uppercase tracking-[0.12em] text-white/35">{title}</p>
+      <div className="mt-2 space-y-1">
+        {items.map((item) => (
+          <p key={item} className="text-[11px] leading-5 text-white/52">
+            {item}
+          </p>
+        ))}
+      </div>
+    </div>
   );
 }
 
