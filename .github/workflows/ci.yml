@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - "fix/**"
+  pull_request:
+
+jobs:
+  build-and-smoke-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Type-check and build workspaces
+        run: |
+          npm run typecheck
+          npm run build
+
+      - name: Validate Compose configuration
+        run: docker compose config
+
+      - name: Build web and API images
+        run: docker compose build web api
+
+      - name: Start web container
+        run: docker run --detach --name african-guard-web-ci --publish 3000:3000 african-guard-web
+
+      - name: Verify page and Next.js assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:3000/ > /tmp/index.html; then
+              break
+            fi
+            sleep 2
+          done
+
+          python - <<'PY'
+          import re
+          import urllib.parse
+          import urllib.request
+
+          base = "http://127.0.0.1:3000/"
+          html = urllib.request.urlopen(base, timeout=10).read().decode("utf-8")
+          assets = sorted(set(re.findall(r'(?:src|href)="([^"]*_next/static/[^"]+)"', html)))
+          if not assets:
+              raise SystemExit("No Next.js static assets were found in the rendered page.")
+
+          for asset in assets:
+              url = urllib.parse.urljoin(base, asset)
+              response = urllib.request.urlopen(url, timeout=10)
+              if response.status != 200:
+                  raise SystemExit(f"Asset returned {response.status}: {url}")
+              print(f"200 {url}")
+          PY
+
+      - name: Show web logs on failure
+        if: failure()
+        run: docker logs african-guard-web-ci || true
