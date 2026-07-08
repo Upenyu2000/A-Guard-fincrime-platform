@@ -108,7 +108,22 @@ export interface InvestigationCase {
 
 export interface GraphNode {
   id: string;
-  type: "user" | "device" | "email" | "ip" | "account" | "transaction" | "merchant";
+  type:
+    | "user"
+    | "device"
+    | "email"
+    | "ip"
+    | "account"
+    | "transaction"
+    | "merchant"
+    | "business"
+    | "director"
+    | "shareholder"
+    | "ubo"
+    | "address"
+    | "wallet"
+    | "beneficiary"
+    | "institution";
   label: string;
   risk: number;
   x: number;
@@ -119,7 +134,20 @@ export interface GraphEdge {
   id: string;
   source: string;
   target: string;
-  relationship: "owns" | "used_on" | "transferred_to" | "linked_to" | "suspicious_connection";
+  relationship:
+    | "owns"
+    | "used_on"
+    | "transferred_to"
+    | "linked_to"
+    | "suspicious_connection"
+    | "directs"
+    | "controls"
+    | "registered_at"
+    | "benefits_from"
+    | "shares_device"
+    | "shares_ip"
+    | "funded_by"
+    | "paid_to";
   weight: number;
 }
 

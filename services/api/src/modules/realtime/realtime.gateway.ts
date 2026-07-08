@@ -11,6 +11,7 @@ import { OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { Server, Socket } from "socket.io";
 import { DataStoreService } from "../../data-store.service";
 import { FraudEventInput } from "../../domain";
+import { AmlService } from "../aml/aml.service";
 import { FraudEngineService } from "../fraud/fraud-engine.service";
 
 @WebSocketGateway({
@@ -27,6 +28,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   constructor(
     private readonly dataStore: DataStoreService,
     private readonly fraudEngine: FraudEngineService,
+    private readonly amlService: AmlService,
   ) {}
 
   handleConnection(client: Socket) {
@@ -53,6 +55,18 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
         this.server.emit("fraud.alert", persistence.alert);
       }
 
+      const aml = this.amlService.evaluateSyntheticStreamEvent();
+      this.server.emit("aml.transaction.evaluated", aml.transaction);
+      if (aml.alert) this.server.emit("aml.alert.created", aml.alert);
+      for (const cluster of aml.clusters) {
+        this.server.emit("aml.microtransaction.cluster.detected", cluster);
+      }
+      if (aml.customer) this.server.emit("aml.customer.risk.changed", aml.customer);
+      if (aml.business) this.server.emit("aml.business.risk.changed", aml.business);
+      if (aml.screening) this.server.emit("aml.screening.match.created", aml.screening);
+      if (aml.case) this.server.emit("aml.case.escalated", aml.case);
+      if (aml.sar) this.server.emit("aml.sar.ready_for_review", aml.sar);
+      this.server.emit("aml.overview", aml.overview);
       this.server.emit("operating.picture", this.dataStore.operatingPicture());
     }, 4500);
   }

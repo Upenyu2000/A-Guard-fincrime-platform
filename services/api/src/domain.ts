@@ -26,6 +26,9 @@ export type UserRole =
   | "analyst"
   | "fraud_investigator"
   | "compliance_officer"
+  | "mlro"
+  | "rule_administrator"
+  | "internal_auditor"
   | "admin"
   | "institution_partner";
 
@@ -182,7 +185,22 @@ export interface InvestigationCase {
 
 export interface GraphNode {
   id: string;
-  type: "user" | "device" | "email" | "ip" | "account" | "transaction" | "merchant";
+  type:
+    | "user"
+    | "device"
+    | "email"
+    | "ip"
+    | "account"
+    | "transaction"
+    | "merchant"
+    | "business"
+    | "director"
+    | "shareholder"
+    | "ubo"
+    | "address"
+    | "wallet"
+    | "beneficiary"
+    | "institution";
   label: string;
   risk: number;
   x: number;
@@ -198,7 +216,15 @@ export interface GraphEdge {
     | "used_on"
     | "transferred_to"
     | "linked_to"
-    | "suspicious_connection";
+    | "suspicious_connection"
+    | "directs"
+    | "controls"
+    | "registered_at"
+    | "benefits_from"
+    | "shares_device"
+    | "shares_ip"
+    | "funded_by"
+    | "paid_to";
   weight: number;
 }
 

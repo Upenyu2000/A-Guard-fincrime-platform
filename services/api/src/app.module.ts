@@ -4,6 +4,7 @@ import { ConfigModule } from "@nestjs/config";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { AppController } from "./app.controller";
 import { DataStoreService } from "./data-store.service";
+import { AmlModule } from "./modules/aml/aml.module";
 import { FraudEngineService } from "./modules/fraud/fraud-engine.service";
 import { RealtimeGateway } from "./modules/realtime/realtime.gateway";
 import { RbacGuard } from "./modules/security/rbac.guard";
@@ -12,6 +13,7 @@ import { SecurityService } from "./modules/security/security.service";
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    AmlModule,
     ThrottlerModule.forRoot([
       {
         ttl: 60_000,

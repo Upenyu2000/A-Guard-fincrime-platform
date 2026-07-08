@@ -40,6 +40,7 @@ import {
 import { fallbackPicture } from "@/lib/fallback";
 import { useGuardStore } from "@/lib/store";
 import { Alert, InvestigationCase, OperatingPicture, Payment, RiskLevel } from "@/lib/types";
+import { AppNavigation } from "./AppNavigation";
 
 const money = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -120,7 +121,7 @@ export function OperatingConsole() {
   return (
     <main className="min-h-screen w-full overflow-x-hidden px-4 py-4 text-white sm:px-5 lg:px-6">
       <div className="mx-auto flex w-full max-w-[1800px] gap-4 overflow-hidden">
-        <SideRail connected={connected} />
+        <AppNavigation connected={connected} />
         <section className="min-w-0 max-w-full flex-1 overflow-hidden">
           <TopBar
             connected={connected}
@@ -552,9 +553,28 @@ function PaymentRoute({ payment }: { payment: Payment }) {
 }
 
 function IdentityGraph({ picture }: { picture: OperatingPicture }) {
+  const graph = useMemo(() => {
+    const nodesByValue = new Map<string, (typeof picture.graph.nodes)[number]>();
+    const canonicalIdById = new Map<string, string>();
+    for (const node of picture.graph.nodes) {
+      const key = `${node.label.toLowerCase()}::${node.type}`;
+      const canonical = nodesByValue.get(key) ?? node;
+      nodesByValue.set(key, canonical);
+      canonicalIdById.set(node.id, canonical.id);
+    }
+    const edgesByValue = new Map<string, (typeof picture.graph.edges)[number]>();
+    for (const edge of picture.graph.edges) {
+      const source = canonicalIdById.get(edge.source) ?? edge.source;
+      const target = canonicalIdById.get(edge.target) ?? edge.target;
+      if (source === target) continue;
+      const key = `${source}::${target}::${edge.relationship}`;
+      if (!edgesByValue.has(key)) edgesByValue.set(key, { ...edge, id: key, source, target });
+    }
+    return { nodes: [...nodesByValue.values()], edges: [...edgesByValue.values()] };
+  }, [picture.graph.edges, picture.graph.nodes]);
   const nodesById = useMemo(
-    () => new Map(picture.graph.nodes.map((node) => [node.id, node])),
-    [picture.graph.nodes],
+    () => new Map(graph.nodes.map((node) => [node.id, node])),
+    [graph.nodes],
   );
 
   return (
@@ -562,7 +582,7 @@ function IdentityGraph({ picture }: { picture: OperatingPicture }) {
       <SectionHeader icon={GitBranch} eyebrow="Identity graph" title="Risk propagation and fraud rings" />
       <div className="grid-surface relative h-[390px] overflow-hidden rounded-lg border border-white/10 bg-[#0b0c19]">
         <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-          {picture.graph.edges.map((edge) => {
+          {graph.edges.map((edge) => {
             const source = nodesById.get(edge.source);
             const target = nodesById.get(edge.target);
             if (!source || !target) return null;
@@ -579,7 +599,7 @@ function IdentityGraph({ picture }: { picture: OperatingPicture }) {
             );
           })}
         </svg>
-        {picture.graph.nodes.map((node) => (
+        {graph.nodes.map((node) => (
           <div
             key={node.id}
             className="absolute -translate-x-1/2 -translate-y-1/2 rounded-lg border border-white/14 bg-black/52 px-2 py-1 shadow-glass"

@@ -45,6 +45,83 @@ enum PaymentStatus {
   COMPLETED
 }
 
+enum VerificationStatus {
+  NOT_STARTED
+  INFORMATION_REQUESTED
+  VERIFICATION_IN_PROGRESS
+  PASSED
+  REFERRED
+  EDD_REQUIRED
+  REJECTED
+  EXPIRED
+  REVIEW_OVERDUE
+}
+
+enum ScreeningResultStatus {
+  LIVE_PROVIDER_RESULT
+  MOCK_RESULT
+  TEST_RESULT
+  MANUAL_VERIFICATION_REQUIRED
+  PROVIDER_UNAVAILABLE
+  SCREENING_NOT_COMPLETED
+}
+
+enum ScreeningDisposition {
+  CLEAR
+  POSSIBLE_MATCH
+  TRUE_MATCH
+  FALSE_POSITIVE
+  NEEDS_REVIEW
+}
+
+enum AmlDecision {
+  APPROVE
+  APPROVE_MONITOR
+  STEP_UP
+  REVIEW
+  HOLD
+  BLOCK
+  ESCALATE
+}
+
+enum AmlRuleProductionStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  ACTIVE
+  INACTIVE
+  RETIRED
+}
+
+enum ApprovalStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum AmlAlertStatus {
+  NEW
+  UNASSIGNED
+  ASSIGNED
+  IN_REVIEW
+  INFORMATION_REQUESTED
+  ESCALATED
+  CONVERTED_TO_CASE
+  CLOSED_FALSE_POSITIVE
+  CLOSED_EXPLAINED_ACTIVITY
+  CLOSED_WITH_MONITORING
+  CONFIRMED_SUSPICIOUS
+  REFERRED_TO_MLRO
+}
+
+enum SarStatus {
+  DRAFT
+  READY_FOR_REVIEW
+  APPROVED
+  REJECTED
+}
+
 model Institution {
   id             String   @id @default(cuid())
   name           String
@@ -151,4 +228,638 @@ model AuditLog {
   target    String
   metadata  Json
   createdAt DateTime @default(now())
+}
+
+model Customer {
+  id                         String               @id
+  fullLegalName              String
+  previousNames              String[]             @default([])
+  dateOfBirth                DateTime?
+  nationality                String
+  countryOfResidence         String
+  telephoneNumber            String?
+  emailAddress               String?
+  occupation                 String?
+  employer                   String?
+  expectedAccountPurpose     String?
+  expectedMonthlyIncome      Decimal?
+  expectedTransactionVolume  Decimal?
+  expectedPaymentCorridors   String[]             @default([])
+  expectedCounterparties     String[]             @default([])
+  sourceOfFunds              String?
+  sourceOfWealth             String?
+  taxResidency               String[]             @default([])
+  riskScore                  Int                  @default(0)
+  kycStatus                  VerificationStatus   @default(NOT_STARTED)
+  lastReviewDate             DateTime?
+  nextReviewDate             DateTime?
+  createdAt                  DateTime             @default(now())
+  updatedAt                  DateTime             @updatedAt
+  identities                 CustomerIdentity[]
+  addresses                  CustomerAddress[]
+  accounts                   Account[]
+  wallets                    Wallet[]
+  transactions               Transaction[]
+  kycAssessments             KycAssessment[]
+  screeningChecks            ScreeningCheck[]
+  amlAlerts                  AmlAlert[]
+  manualOverrides            ManualOverride[]
+
+  @@index([countryOfResidence])
+  @@index([riskScore])
+  @@index([kycStatus])
+  @@map("customers")
+}
+
+model CustomerIdentity {
+  id                   String             @id @default(cuid())
+  customerId           String
+  customer             Customer           @relation(fields: [customerId], references: [id])
+  documentType         String
+  issuingCountry       String
+  maskedDocumentNumber String
+  expiresAt            DateTime?
+  livenessStatus       VerificationStatus @default(NOT_STARTED)
+  metadata             Json
+  createdAt            DateTime           @default(now())
+
+  @@index([customerId])
+  @@index([expiresAt])
+  @@map("customer_identities")
+}
+
+model CustomerAddress {
+  id                 String             @id @default(cuid())
+  customerId         String
+  customer           Customer           @relation(fields: [customerId], references: [id])
+  addressLine        String
+  country            String
+  verificationStatus VerificationStatus @default(NOT_STARTED)
+  createdAt          DateTime           @default(now())
+
+  @@index([customerId])
+  @@index([country])
+  @@map("customer_addresses")
+}
+
+model Business {
+  id                         String               @id
+  legalName                  String
+  tradingName                String?
+  companyNumber              String
+  incorporationDate          DateTime?
+  incorporationCountry       String
+  registeredAddress          String
+  tradingAddress             String?
+  businessType               String
+  industry                   String
+  website                    String?
+  emailDomain                String?
+  declaredTurnover           Decimal?
+  expectedTransactionVolume  Decimal?
+  countriesOfOperation       String[]             @default([])
+  regulatoryStatus           String?
+  sourceOfBusinessFunds      String?
+  businessRelationshipPurpose String?
+  licences                   String[]             @default([])
+  taxInformation             String?
+  kybStatus                  VerificationStatus   @default(NOT_STARTED)
+  riskScore                  Int                  @default(0)
+  lastReviewDate             DateTime?
+  nextReviewDate             DateTime?
+  createdAt                  DateTime             @default(now())
+  updatedAt                  DateTime             @updatedAt
+  directors                  BusinessDirector[]
+  shareholders               BusinessShareholder[]
+  beneficialOwners           BeneficialOwner[]
+  parentRelationships        OwnershipRelationship[] @relation("ChildBusiness")
+  childRelationships         OwnershipRelationship[] @relation("ParentBusiness")
+  accounts                   Account[]
+  wallets                    Wallet[]
+  transactions               Transaction[]
+  kybAssessments             KybAssessment[]
+  screeningChecks            ScreeningCheck[]
+  amlAlerts                  AmlAlert[]
+  manualOverrides            ManualOverride[]
+
+  @@index([companyNumber])
+  @@index([incorporationCountry])
+  @@index([riskScore])
+  @@index([kybStatus])
+  @@map("businesses")
+}
+
+model BusinessDirector {
+  id          String   @id @default(cuid())
+  businessId  String
+  business    Business @relation(fields: [businessId], references: [id])
+  name        String
+  country     String
+  riskLevel   RiskLevel
+  createdAt   DateTime @default(now())
+
+  @@index([businessId])
+  @@index([country])
+  @@map("business_directors")
+}
+
+model BusinessShareholder {
+  id             String   @id @default(cuid())
+  businessId     String
+  business       Business @relation(fields: [businessId], references: [id])
+  name           String
+  ownershipPct   Decimal
+  riskLevel      RiskLevel
+  createdAt      DateTime @default(now())
+
+  @@index([businessId])
+  @@map("business_shareholders")
+}
+
+model BeneficialOwner {
+  id             String   @id @default(cuid())
+  businessId     String
+  business       Business @relation(fields: [businessId], references: [id])
+  name           String
+  ownershipPct   Decimal
+  riskLevel      RiskLevel
+  screeningChecks ScreeningCheck[]
+  createdAt      DateTime @default(now())
+
+  @@index([businessId])
+  @@index([riskLevel])
+  @@map("beneficial_owners")
+}
+
+model OwnershipRelationship {
+  id               String   @id @default(cuid())
+  parentBusinessId String
+  childBusinessId  String
+  parentBusiness   Business @relation("ParentBusiness", fields: [parentBusinessId], references: [id])
+  childBusiness    Business @relation("ChildBusiness", fields: [childBusinessId], references: [id])
+  relationshipType String
+  ownershipPct     Decimal?
+  createdAt        DateTime @default(now())
+
+  @@index([parentBusinessId])
+  @@index([childBusinessId])
+  @@map("ownership_relationships")
+}
+
+model Account {
+  id           String        @id
+  customerId   String?
+  customer     Customer?     @relation(fields: [customerId], references: [id])
+  businessId   String?
+  business     Business?     @relation(fields: [businessId], references: [id])
+  accountType  String
+  currency     String
+  status       String
+  transactions Transaction[]
+  wallets      Wallet[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([customerId])
+  @@index([businessId])
+  @@index([currency])
+  @@index([status])
+  @@map("accounts")
+}
+
+model Wallet {
+  id           String        @id
+  customerId   String?
+  customer     Customer?     @relation(fields: [customerId], references: [id])
+  businessId   String?
+  business     Business?     @relation(fields: [businessId], references: [id])
+  accountId    String?
+  account      Account?      @relation(fields: [accountId], references: [id])
+  provider     String
+  status       String
+  transactions Transaction[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([customerId])
+  @@index([businessId])
+  @@index([accountId])
+  @@index([status])
+  @@map("wallets")
+}
+
+model Counterparty {
+  id           String        @id
+  name         String
+  country      String?
+  type         String
+  transactions Transaction[]
+
+  @@index([country])
+  @@map("counterparties")
+}
+
+model Beneficiary {
+  id           String        @id
+  name         String
+  accountRef   String?
+  country      String?
+  riskScore    Int           @default(0)
+  transactions Transaction[]
+
+  @@index([country])
+  @@index([riskScore])
+  @@map("beneficiaries")
+}
+
+model Device {
+  id           String        @id
+  deviceHash   String        @unique
+  riskScore    Int           @default(0)
+  transactions Transaction[]
+
+  @@index([riskScore])
+  @@map("devices")
+}
+
+model IpAddress {
+  id           String        @id @default(cuid())
+  address      String        @unique
+  country      String?
+  riskScore    Int           @default(0)
+  transactions Transaction[]
+
+  @@index([country])
+  @@index([riskScore])
+  @@map("ip_addresses")
+}
+
+model Transaction {
+  id                     String          @id
+  eventId                String          @unique
+  institution            String
+  customerId             String?
+  customer               Customer?       @relation(fields: [customerId], references: [id])
+  businessId             String?
+  business               Business?       @relation(fields: [businessId], references: [id])
+  accountId              String?
+  account                Account?        @relation(fields: [accountId], references: [id])
+  walletId               String?
+  wallet                 Wallet?         @relation(fields: [walletId], references: [id])
+  counterpartyId          String?
+  counterparty            Counterparty?   @relation(fields: [counterpartyId], references: [id])
+  beneficiaryId           String?
+  beneficiary             Beneficiary?    @relation(fields: [beneficiaryId], references: [id])
+  deviceId                String?
+  device                  Device?         @relation(fields: [deviceId], references: [id])
+  ipAddressId             String?
+  ipAddress               IpAddress?      @relation(fields: [ipAddressId], references: [id])
+  sender                  String
+  receiver                String
+  amount                  Decimal
+  currency                String
+  baseCurrencyEquivalent  Decimal
+  originCountry           String
+  destinationCountry      String
+  channel                 String
+  paymentMethod           String
+  description             String?
+  status                  String
+  fraudRisk               Int             @default(0)
+  amlRisk                 Int             @default(0)
+  unifiedRisk             Int             @default(0)
+  decision                AmlDecision
+  rulesTriggered          Json
+  alertStatus             AmlAlertStatus?
+  componentScores         Json
+  explainability          Json
+  occurredAt              DateTime
+  createdAt               DateTime        @default(now())
+  alertLinks              AmlAlertTransaction[]
+
+  @@index([occurredAt])
+  @@index([customerId])
+  @@index([businessId])
+  @@index([accountId])
+  @@index([walletId])
+  @@index([sender])
+  @@index([receiver])
+  @@index([beneficiaryId])
+  @@index([deviceId])
+  @@index([ipAddressId])
+  @@index([originCountry])
+  @@index([destinationCountry])
+  @@index([currency])
+  @@index([amount])
+  @@index([unifiedRisk])
+  @@index([alertStatus])
+  @@index([status])
+  @@map("aml_transactions")
+}
+
+model KycAssessment {
+  id                 String             @id @default(cuid())
+  customerId         String
+  customer           Customer           @relation(fields: [customerId], references: [id])
+  status             VerificationStatus
+  riskScore          Int
+  checks             Json
+  decisionReason     String
+  reviewer           String?
+  nextReviewDate     DateTime?
+  createdAt          DateTime           @default(now())
+
+  @@index([customerId])
+  @@index([status])
+  @@index([riskScore])
+  @@map("kyc_assessments")
+}
+
+model KybAssessment {
+  id                 String             @id @default(cuid())
+  businessId         String
+  business           Business           @relation(fields: [businessId], references: [id])
+  status             VerificationStatus
+  riskScore          Int
+  checks             Json
+  decisionReason     String
+  reviewer           String?
+  nextReviewDate     DateTime?
+  createdAt          DateTime           @default(now())
+
+  @@index([businessId])
+  @@index([status])
+  @@index([riskScore])
+  @@map("kyb_assessments")
+}
+
+model ScreeningCheck {
+  id               String                @id
+  customerId       String?
+  customer         Customer?             @relation(fields: [customerId], references: [id])
+  businessId       String?
+  business         Business?             @relation(fields: [businessId], references: [id])
+  beneficialOwnerId String?
+  beneficialOwner  BeneficialOwner?      @relation(fields: [beneficialOwnerId], references: [id])
+  subjectId        String
+  subjectType      String
+  checkType        String
+  provider         String
+  datasetVersion   String
+  resultStatus     ScreeningResultStatus
+  matchScore       Int
+  matchingFields   String[]              @default([])
+  disposition      ScreeningDisposition
+  reviewer         String?
+  evidence         Json
+  nextReviewDate   DateTime?
+  checkedAt        DateTime
+  createdAt        DateTime              @default(now())
+  matches          ScreeningMatch[]
+
+  @@index([customerId])
+  @@index([businessId])
+  @@index([beneficialOwnerId])
+  @@index([subjectId])
+  @@index([checkType])
+  @@index([disposition])
+  @@index([checkedAt])
+  @@map("screening_checks")
+}
+
+model ScreeningMatch {
+  id                String          @id @default(cuid())
+  screeningCheckId  String
+  screeningCheck    ScreeningCheck  @relation(fields: [screeningCheckId], references: [id])
+  matchedName       String
+  matchScore        Int
+  matchingFields    String[]        @default([])
+  evidence          Json
+  createdAt         DateTime        @default(now())
+
+  @@index([screeningCheckId])
+  @@map("screening_matches")
+}
+
+model AmlRule {
+  id                         String                   @id
+  name                       String
+  description                String
+  category                   String
+  jurisdiction               String
+  institution                String
+  customerSegment            String
+  businessSegment            String
+  transactionChannel         String
+  field                      String
+  operator                   String
+  comparisonValue            String
+  aggregation                String
+  rollingWindow              String
+  countThreshold             Int
+  cumulativeThreshold        Decimal
+  scoreContribution          Int
+  priority                   RiskLevel
+  action                     AmlDecision
+  effectiveDate              DateTime
+  expiryDate                 DateTime?
+  owner                      String
+  currentVersion             Int                      @default(1)
+  approvalStatus             ApprovalStatus
+  productionStatus           AmlRuleProductionStatus
+  logic                      Json
+  estimatedAlertVolume       Int                      @default(0)
+  estimatedFalsePositiveRate Decimal                  @default(0)
+  createdAt                  DateTime                 @default(now())
+  updatedAt                  DateTime                 @updatedAt
+  versions                   AmlRuleVersion[]
+  testResults                RuleTestResult[]
+  approvals                  Approval[]
+
+  @@index([category])
+  @@index([jurisdiction])
+  @@index([institution])
+  @@index([productionStatus])
+  @@index([approvalStatus])
+  @@map("aml_rules")
+}
+
+model AmlRuleVersion {
+  id         String   @id @default(cuid())
+  ruleId     String
+  rule       AmlRule  @relation(fields: [ruleId], references: [id])
+  version    Int
+  definition Json
+  changedBy  String
+  reason     String
+  createdAt  DateTime @default(now())
+
+  @@index([ruleId])
+  @@index([version])
+  @@map("aml_rule_versions")
+}
+
+model RuleTestResult {
+  id                      String   @id @default(cuid())
+  ruleId                  String
+  rule                    AmlRule  @relation(fields: [ruleId], references: [id])
+  matchedTransactionCount Int
+  estimatedAlertVolume    Int
+  estimatedFalsePositiveRate Decimal
+  sampleEvidence          Json
+  createdAt               DateTime @default(now())
+
+  @@index([ruleId])
+  @@map("rule_test_results")
+}
+
+model AmlAlert {
+  id                   String          @id
+  category             String
+  eventId              String
+  customerId           String?
+  customer             Customer?       @relation(fields: [customerId], references: [id])
+  businessId           String?
+  business             Business?       @relation(fields: [businessId], references: [id])
+  subjectId            String
+  subjectType          String
+  rulesTriggered       Json
+  riskScores           Json
+  cumulativeAmount     Decimal
+  transactionCount     Int
+  rollingWindow        String
+  explanation          String
+  evidence             Json
+  suggestedAction      String
+  assignedAnalyst      String?
+  status               AmlAlertStatus
+  serviceLevelDeadline DateTime
+  relatedAlerts        Json
+  relatedCases         Json
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  transactions         AmlAlertTransaction[]
+  notes                InvestigationNote[]
+  approvals            Approval[]
+
+  @@index([customerId])
+  @@index([businessId])
+  @@index([subjectId])
+  @@index([category])
+  @@index([status])
+  @@index([createdAt])
+  @@map("aml_alerts")
+}
+
+model AmlAlertTransaction {
+  id            String      @id @default(cuid())
+  alertId       String
+  alert         AmlAlert    @relation(fields: [alertId], references: [id])
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
+
+  @@unique([alertId, transactionId])
+  @@index([transactionId])
+  @@map("aml_alert_transactions")
+}
+
+model InvestigationEvidence {
+  id          String   @id @default(cuid())
+  caseId      String
+  type        String
+  label       String
+  confidence  Int
+  metadata    Json
+  createdAt   DateTime @default(now())
+
+  @@index([caseId])
+  @@map("investigation_evidence")
+}
+
+model InvestigationNote {
+  id        String    @id @default(cuid())
+  alertId   String?
+  alert     AmlAlert? @relation(fields: [alertId], references: [id])
+  caseId    String?
+  actor     String
+  role      String
+  note      String
+  createdAt DateTime  @default(now())
+
+  @@index([alertId])
+  @@index([caseId])
+  @@map("investigation_notes")
+}
+
+model SarDraft {
+  id                    String     @id
+  caseId                String
+  subjectIds            String[]   @default([])
+  businessIds           String[]   @default([])
+  accountIds            String[]   @default([])
+  walletIds             String[]   @default([])
+  transactionChronology Json
+  totalSuspiciousValue  Decimal
+  suspicionIndicators   Json
+  reasonForSuspicion    String
+  paymentCorridors      String[]   @default([])
+  sourceOfFundsConcerns Json
+  relatedEntities       String[]   @default([])
+  supportingEvidence    Json
+  internalReferences    String[]   @default([])
+  glossaryCategories    String[]   @default([])
+  investigator          String
+  mlroReviewStatus      SarStatus
+  narrative             String
+  aiGenerated           Boolean    @default(true)
+  tippingOffControls    Json
+  version               Int        @default(1)
+  approvedBy            String?
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+  approvals             Approval[]
+
+  @@index([caseId])
+  @@index([mlroReviewStatus])
+  @@map("sar_drafts")
+}
+
+model Approval {
+  id          String          @id @default(cuid())
+  approver    String
+  role        String
+  status      ApprovalStatus
+  reason      String
+  ruleId      String?
+  rule        AmlRule?        @relation(fields: [ruleId], references: [id])
+  alertId     String?
+  alert       AmlAlert?       @relation(fields: [alertId], references: [id])
+  sarDraftId  String?
+  sarDraft    SarDraft?       @relation(fields: [sarDraftId], references: [id])
+  createdAt   DateTime        @default(now())
+
+  @@index([ruleId])
+  @@index([alertId])
+  @@index([sarDraftId])
+  @@map("approvals")
+}
+
+model ManualOverride {
+  id            String     @id @default(cuid())
+  actor         String
+  role          String
+  target        String
+  previousValue Json
+  newValue      Json
+  reason        String
+  customerId    String?
+  customer      Customer?  @relation(fields: [customerId], references: [id])
+  businessId    String?
+  business      Business?  @relation(fields: [businessId], references: [id])
+  createdAt     DateTime   @default(now())
+
+  @@index([target])
+  @@index([customerId])
+  @@index([businessId])
+  @@map("manual_overrides")
 }
