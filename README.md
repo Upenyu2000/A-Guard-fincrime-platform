@@ -19,7 +19,7 @@ The platform simulates the production flow:
 ## Local Development
 
 ```bash
-npm install
+npm ci
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r services/ai/requirements.txt
@@ -32,8 +32,37 @@ The web app runs at `http://localhost:3000`, the API at `http://localhost:4000`,
 
 ## Docker
 
+Start the full stack:
+
 ```bash
 docker compose up --build
 ```
 
 The compose stack includes PostgreSQL, Redis, Kafka, Neo4j, the API, the AI service, and the web app.
+
+After changing Dockerfiles, dependencies, or the Next.js build, use a clean rebuild so the browser receives the matching JavaScript and CSS assets:
+
+```bash
+docker compose down --remove-orphans
+docker compose build --no-cache web api ai
+docker compose up
+```
+
+Verify the services:
+
+- Web console: `http://localhost:3000`
+- API health: `http://localhost:4000/v1/health`
+- AI health: `http://localhost:8001/health`
+- Neo4j browser: `http://localhost:7474`
+
+Host ports can be changed without editing `docker-compose.yml`. For example, in PowerShell:
+
+```powershell
+$env:WEB_PORT = "3001"
+$env:API_PORT = "4001"
+$env:NEXT_PUBLIC_API_URL = "http://localhost:4001"
+$env:NEXT_PUBLIC_WS_URL = "http://localhost:4001"
+docker compose up --build
+```
+
+When the web image is rebuilt, perform a hard browser refresh (`Ctrl+Shift+R`) to clear references to older Next.js chunks.
