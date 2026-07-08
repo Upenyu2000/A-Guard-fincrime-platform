@@ -89,6 +89,17 @@ export interface AmlExplainabilityFactor {
   evidence: string;
 }
 
+export interface ResearchRiskSignal {
+  id: string;
+  name: string;
+  paper: string;
+  score: number;
+  riskLevel: RiskLevel;
+  implementedAs: "auditable_heuristic" | "model_registry" | "provider_required" | "research_backlog";
+  evidence: string[];
+  governanceStatus: "active_control" | "shadow_mode" | "review_only" | "not_connected";
+}
+
 export interface AmlRiskDecision {
   fraudRisk: number;
   amlRisk: number;
@@ -103,6 +114,7 @@ export interface AmlRiskDecision {
   confidence: number;
   dataQualityWarnings: string[];
   rollingWindows: RollingWindowMetrics[];
+  researchSignals: ResearchRiskSignal[];
 }
 
 export interface AmlTransaction {
@@ -148,6 +160,71 @@ export interface AmlTransaction {
   sharedBeneficiaries: string[];
   historicalAlerts: string[];
   recommendedAction: string;
+  researchSignals?: ResearchRiskSignal[];
+}
+
+export interface FinraCourse {
+  no: number;
+  title: string;
+  courseId: string;
+  contentType: "WBT";
+  category: string;
+  durationMinutes: number;
+  ceCategory: string;
+  ceCredit: number;
+  cfpProgramId: string;
+  active: boolean;
+  controlMappings: string[];
+  summary: string;
+}
+
+export interface ResearchPaperReview {
+  id: string;
+  year: number;
+  venue: string;
+  title: string;
+  authors: string;
+  theme:
+    | "attribute_graph_patterns"
+    | "limited_labels"
+    | "unsupervised_heterophily"
+    | "test_time_retrieval"
+    | "dynamic_graph_contrastive"
+    | "adversarial_robustness"
+    | "llm_explainability"
+    | "federated_learning"
+    | "pretraining_prompting"
+    | "multimodal_behavior"
+    | "rules_optimization"
+    | "temporal_sequence"
+    | "graph_aml"
+    | "classic_fraud_mining";
+  implementationStatus: "active_control" | "shadow_mode" | "reviewed" | "backlog";
+  implementedAs: string;
+  appSurface: string[];
+  review: string;
+  limitations: string;
+}
+
+export interface ResearchImplementationModule {
+  id: string;
+  name: string;
+  sourcePapers: string[];
+  status: "active" | "shadow_mode" | "review_only" | "provider_required";
+  riskSignals: string[];
+  evidenceRequired: string[];
+  fairnessControls: string[];
+  auditEvents: string[];
+}
+
+export interface RepositoryIntegrationReview {
+  id: string;
+  repository: string;
+  url: string;
+  observedPattern: string;
+  integratedFeature: string;
+  status: "implemented" | "reviewed_not_imported" | "provider_required";
+  notes: string;
 }
 
 export interface CustomerKycProfile {
@@ -498,6 +575,10 @@ export interface AmlWorkspaceSnapshot {
   investigations: AmlInvestigation[];
   sarDrafts: SarDraft[];
   audit: AuditEvent[];
+  finraCourses: FinraCourse[];
+  researchPaperReviews: ResearchPaperReview[];
+  researchImplementations: ResearchImplementationModule[];
+  repositoryReviews: RepositoryIntegrationReview[];
   relationshipGraph: {
     nodes: GraphNode[];
     edges: GraphEdge[];

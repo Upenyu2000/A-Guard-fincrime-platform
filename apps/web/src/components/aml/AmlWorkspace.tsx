@@ -10,8 +10,10 @@ import {
   ClipboardList,
   FileText,
   Gavel,
+  GraduationCap,
   LayoutDashboard,
   Loader2,
+  Microscope,
   Network,
   ReceiptText,
   ScanSearch,
@@ -19,6 +21,7 @@ import {
   Wifi,
   WifiOff,
 } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { io } from "socket.io-client";
 import { AppNavigation } from "@/components/AppNavigation";
@@ -49,7 +52,9 @@ import { AmlOverview } from "./AmlOverview";
 import { BusinessKybWorkspace } from "./BusinessKybWorkspace";
 import { CustomerKycWorkspace } from "./CustomerKycWorkspace";
 import { EmptyState, Panel } from "./aml-ui";
+import { FinraTrainingWorkspace } from "./FinraTrainingWorkspace";
 import { MicrotransactionIntelligence } from "./MicrotransactionIntelligence";
+import { ResearchModelWorkspace } from "./ResearchModelWorkspace";
 import { RuleBuilder } from "./RuleBuilder";
 import { SarWorkspace } from "./SarWorkspace";
 import { ScreeningWorkspace } from "./ScreeningWorkspace";
@@ -57,24 +62,26 @@ import { TransactionDetailDrawer } from "./TransactionDetailDrawer";
 import { TransactionMonitor } from "./TransactionMonitor";
 
 const tabs = [
-  { id: "overview", label: "Overview", icon: LayoutDashboard },
-  { id: "transactions", label: "Transaction Monitoring", icon: ReceiptText },
-  { id: "microtransactions", label: "Microtransaction Intelligence", icon: Network },
-  { id: "kyc", label: "Customer KYC", icon: ShieldCheck },
-  { id: "kyb", label: "Business KYB", icon: Building2 },
-  { id: "screening", label: "Screening", icon: ScanSearch },
-  { id: "rules", label: "Rules and Scenarios", icon: Gavel },
-  { id: "alerts", label: "Alerts", icon: Bell },
-  { id: "investigations", label: "Investigations", icon: BriefcaseBusiness },
-  { id: "sar", label: "SAR Workspace", icon: FileText },
-  { id: "audit", label: "Audit and Governance", icon: ClipboardList },
+  { id: "overview", label: "Overview", icon: LayoutDashboard, href: "/aml" },
+  { id: "transactions", label: "Transaction Monitoring", icon: ReceiptText, href: "/aml/transactions" },
+  { id: "microtransactions", label: "Microtransaction Intelligence", icon: Network, href: "/aml/microtransactions" },
+  { id: "kyc", label: "Customer KYC", icon: ShieldCheck, href: "/aml/kyc" },
+  { id: "kyb", label: "Business KYB", icon: Building2, href: "/aml/kyb" },
+  { id: "screening", label: "Screening", icon: ScanSearch, href: "/aml/screening" },
+  { id: "rules", label: "Rules and Scenarios", icon: Gavel, href: "/aml/rules" },
+  { id: "alerts", label: "Alerts", icon: Bell, href: "/aml/alerts" },
+  { id: "investigations", label: "Investigations", icon: BriefcaseBusiness, href: "/aml/investigations" },
+  { id: "sar", label: "SAR Workspace", icon: FileText, href: "/aml/sar" },
+  { id: "audit", label: "Audit and Governance", icon: ClipboardList, href: "/aml/audit" },
+  { id: "training", label: "Regulatory Training", icon: GraduationCap, href: "/aml/training" },
+  { id: "research", label: "Research Lab", icon: Microscope, href: "/aml/research" },
 ] as const;
 
-type TabId = (typeof tabs)[number]["id"];
+export type AmlTabId = (typeof tabs)[number]["id"];
 
-export function AmlWorkspace() {
+export function AmlWorkspace({ initialTab = "overview" }: { initialTab?: AmlTabId }) {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<TabId>("overview");
+  const [activeTab, setActiveTab] = useState<AmlTabId>(initialTab);
   const [connected, setConnected] = useState(false);
   const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
   const workspaceQuery = useQuery({ queryKey: ["aml-workspace"], queryFn: fetchAmlWorkspace });
@@ -85,6 +92,10 @@ export function AmlWorkspace() {
     void queryClient.invalidateQueries({ queryKey: ["aml-workspace"] });
     if (selectedTransactionId) void queryClient.invalidateQueries({ queryKey: ["aml-transaction", selectedTransactionId] });
   };
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
 
   const transactionDetailQuery = useQuery({
     queryKey: ["aml-transaction", selectedTransactionId],
@@ -170,6 +181,10 @@ export function AmlWorkspace() {
         return <SarWorkspace drafts={workspace.sarDrafts} onApprove={(id) => actions.approveSar.mutate(id)} />;
       case "audit":
         return <AmlAuditWorkspace audit={workspace.audit} />;
+      case "training":
+        return <FinraTrainingWorkspace courses={workspace.finraCourses} />;
+      case "research":
+        return <ResearchModelWorkspace papers={workspace.researchPaperReviews} implementations={workspace.researchImplementations} repositories={workspace.repositoryReviews} />;
       default:
         return null;
     }
@@ -217,15 +232,16 @@ export function AmlWorkspace() {
               const Icon = tab.icon;
               const active = tab.id === activeTab;
               return (
-                <button
+                <Link
                   key={tab.id}
+                  href={tab.href}
                   className={`flex h-10 shrink-0 items-center gap-2 rounded-lg px-3 text-xs transition ${active ? "bg-gradient-to-r from-guard-violet to-guard-purple text-white shadow-glow" : "text-white/58 hover:bg-white/10 hover:text-white"}`}
                   aria-current={active ? "page" : undefined}
                   onClick={() => setActiveTab(tab.id)}
                 >
                   <Icon className="h-3.5 w-3.5" />
                   {tab.label}
-                </button>
+                </Link>
               );
             })}
           </div>

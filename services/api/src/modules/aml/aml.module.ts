@@ -4,10 +4,11 @@ import { SecurityService } from "../security/security.service";
 import { AmlController } from "./aml.controller";
 import { AmlService } from "./aml.service";
 import { MicrotransactionDetectorService } from "./microtransaction-detector.service";
+import { ResearchRiskService } from "./research-risk.service";
 
 @Module({
   controllers: [AmlController],
-  providers: [AmlService, MicrotransactionDetectorService, FraudEngineService, SecurityService],
+  providers: [AmlService, MicrotransactionDetectorService, ResearchRiskService, FraudEngineService, SecurityService],
   exports: [AmlService],
 })
 export class AmlModule {}

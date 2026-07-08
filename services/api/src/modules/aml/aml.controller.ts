@@ -262,4 +262,28 @@ export class AmlController {
   audit() {
     return this.aml.auditList();
   }
+
+  @Get("training/courses")
+  @Roles("analyst", "fraud_investigator", "compliance_officer", "mlro", "rule_administrator", "internal_auditor", "admin")
+  trainingCourses() {
+    return this.aml.finraCourseList();
+  }
+
+  @Get("research/papers")
+  @Roles("fraud_investigator", "compliance_officer", "mlro", "rule_administrator", "internal_auditor", "admin")
+  researchPapers() {
+    return this.aml.researchPaperList();
+  }
+
+  @Get("research/implementations")
+  @Roles("fraud_investigator", "compliance_officer", "mlro", "rule_administrator", "internal_auditor", "admin")
+  researchImplementations() {
+    return this.aml.researchImplementationList();
+  }
+
+  @Get("research/repositories")
+  @Roles("fraud_investigator", "compliance_officer", "mlro", "rule_administrator", "internal_auditor", "admin")
+  repositoryReviews() {
+    return this.aml.repositoryReviewList();
+  }
 }

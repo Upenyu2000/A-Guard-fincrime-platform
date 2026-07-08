@@ -105,6 +105,32 @@ export function TransactionDetailDrawer({
               </div>
             </Panel>
 
+            {transaction.researchSignals && transaction.researchSignals.length > 0 ? (
+              <Panel>
+                <h3 className="mb-3 text-sm font-semibold text-white">Research-derived signals</h3>
+                <div className="grid gap-2">
+                  {transaction.researchSignals.map((signal) => (
+                    <div key={signal.id} className="rounded-lg border border-cyan-300/15 bg-cyan-400/10 p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-medium text-white">{signal.name}</p>
+                          <p className="mt-1 text-xs text-white/42">{signal.paper}</p>
+                        </div>
+                        <span className="rounded-md border border-white/10 bg-white/[0.06] px-2 py-1 text-xs text-white/70">
+                          {signal.score} - {signal.governanceStatus.replaceAll("_", " ")}
+                        </span>
+                      </div>
+                      <div className="mt-2 grid gap-1">
+                        {signal.evidence.map((item) => (
+                          <p key={item} className="text-xs leading-5 text-cyan-50/62">{item}</p>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Panel>
+            ) : null}
+
             <div className="grid gap-4 lg:grid-cols-2">
               <Panel>
                 <h3 className="mb-3 text-sm font-semibold text-white">Rolling windows</h3>
@@ -136,13 +162,13 @@ export function TransactionDetailDrawer({
                 <div className="grid gap-2">
                   {detail.relatedAlerts.map((alert) => (
                     <div key={alert.id} className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.035] px-3 py-2 text-xs">
-                      <span className="text-white/70">{alert.id} · {alert.category}</span>
+                      <span className="text-white/70">{alert.id} - {alert.category}</span>
                       <span className="capitalize text-white/45">{alert.status.replaceAll("_", " ")}</span>
                     </div>
                   ))}
                   {detail.relatedInvestigations.map((investigation) => (
                     <div key={investigation.id} className="flex items-center justify-between rounded-lg border border-emerald-300/15 bg-emerald-400/10 px-3 py-2 text-xs">
-                      <span className="text-emerald-100">{investigation.id} · {investigation.hypothesis}</span>
+                      <span className="text-emerald-100">{investigation.id} - {investigation.hypothesis}</span>
                       <CheckCircle2 className="h-3.5 w-3.5 text-emerald-200" />
                     </div>
                   ))}

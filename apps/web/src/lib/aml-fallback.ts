@@ -35,5 +35,9 @@ export const fallbackAmlWorkspace: AmlWorkspaceSnapshot = {
   investigations: [],
   sarDrafts: [],
   audit: [],
+  finraCourses: [],
+  researchPaperReviews: [],
+  researchImplementations: [],
+  repositoryReviews: [],
   relationshipGraph: { nodes: [], edges: [] },
 };

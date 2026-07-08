@@ -29,7 +29,14 @@ import {
   screeningChecks as seedScreeningChecks,
   seededClusters,
 } from "./aml.seed";
+import {
+  finraCourses,
+  repositoryReviews,
+  researchImplementations,
+  researchPaperReviews,
+} from "./aml.research";
 import { MicrotransactionDetectorService } from "./microtransaction-detector.service";
+import { ResearchRiskService } from "./research-risk.service";
 import {
   ActorContext,
   AmlAlert,
@@ -70,6 +77,7 @@ export class AmlService {
 
   constructor(
     private readonly detector: MicrotransactionDetectorService,
+    private readonly researchRisk: ResearchRiskService,
     private readonly fraudEngine: FraudEngineService,
     private readonly security: SecurityService,
   ) {}
@@ -87,6 +95,10 @@ export class AmlService {
       investigations: this.investigations,
       sarDrafts: this.sarDrafts,
       audit: this.audit.slice(0, 50),
+      finraCourses,
+      researchPaperReviews,
+      researchImplementations,
+      repositoryReviews,
       relationshipGraph: this.relationshipGraph,
     };
   }
@@ -127,6 +139,8 @@ export class AmlService {
         { label: "SAR drafts awaiting approval", value: this.sarDrafts.filter((draft) => draft.mlroReviewStatus === "ready_for_review").length, format: "number", risk: "high" },
         { label: "False-positive rate", value: Math.round(average(this.rules.map((rule) => rule.performance.falsePositiveRate)) * 10) / 10, format: "percent" },
         { label: "Average alert-handling time", value: Math.round(average(alertHandlingMinutes)), format: "minutes" },
+        { label: "FINRA courses mapped", value: finraCourses.length, format: "number", risk: "low" },
+        { label: "Research controls active", value: researchImplementations.filter((item) => item.status === "active").length, format: "number", risk: "low" },
       ],
       alertVolumeOverTime: this.timelinePoints(this.alerts.map((alert) => alert.createdAt), "Alerts"),
       riskDistribution: this.riskDistribution(),
@@ -231,6 +245,7 @@ export class AmlService {
       componentScores: decision.componentScores,
       explainability: decision.explainability,
       recommendedAction: this.recommendedAction(decision.unifiedRisk, decision.decision),
+      researchSignals: decision.researchSignals,
     };
 
     this.transactions.unshift(evaluated);
@@ -622,6 +637,22 @@ export class AmlService {
     return this.audit.slice(0, 100);
   }
 
+  finraCourseList() {
+    return finraCourses;
+  }
+
+  researchPaperList() {
+    return researchPaperReviews;
+  }
+
+  researchImplementationList() {
+    return researchImplementations;
+  }
+
+  repositoryReviewList() {
+    return repositoryReviews;
+  }
+
   evaluateSyntheticStreamEvent() {
     const source = this.transactions[Math.floor(Math.random() * this.transactions.length)] ?? this.transactions[0]!;
     const synthetic = this.buildTransaction({
@@ -706,6 +737,8 @@ export class AmlService {
     const clusters = this.detector.detectClusters([transaction, ...this.transactions], this.rules);
     const relatedClusters = clusters.filter((cluster) => cluster.transactionIds.includes(transaction.id));
     const rollingWindows = this.detector.calculateRollingWindows([transaction, ...this.transactions], transaction);
+    const researchSignals = this.researchRisk.analyzeTransaction(transaction, [transaction, ...this.transactions], this.relationshipGraph);
+    const researchScore = Math.max(0, ...researchSignals.map((signal) => signal.score));
     const rulesTriggered = [...new Set([...transaction.rulesTriggered, ...relatedClusters.flatMap((cluster) => this.rulesForScenario(cluster.scenario))])];
     const ruleScore = clamp(rulesTriggered.reduce((sum, ruleId) => sum + (this.rules.find((rule) => rule.id === ruleId)?.scoreContribution ?? 8), 0));
     const kycRisk = customer?.customerRiskScore ?? 35;
@@ -744,7 +777,7 @@ export class AmlService {
       deterministicRules: ruleScore,
       mlAnomaly: fraudDecision.component_scores.ml_anomaly,
       behaviouralProfile: fraudDecision.component_scores.behavioural_profile,
-      identityGraph: fraudDecision.component_scores.identity_graph,
+      identityGraph: Math.max(fraudDecision.component_scores.identity_graph, researchSignals.find((signal) => signal.id.includes("graph"))?.score ?? 0),
       consortiumIntelligence: fraudDecision.component_scores.consortium_intelligence,
       amlSanctions: fraudDecision.component_scores.aml_sanctions,
       customerKyc: kycRisk,
@@ -754,7 +787,7 @@ export class AmlService {
       beneficiaryRisk: fraudEvent.signals?.beneficiary_risk ?? 0,
       transactionVelocity: velocityRisk,
       microtransactionCluster: microRisk,
-      historicalOutcomes: transaction.historicalAlerts.length * 18,
+      historicalOutcomes: Math.max(transaction.historicalAlerts.length * 18, researchSignals.find((signal) => signal.id.includes("retrieval"))?.score ?? 0),
     };
     const fraudRisk = fraudDecision.risk_score;
     const amlRisk = Math.round(
@@ -766,7 +799,8 @@ export class AmlService {
           scores.identityGraph * 0.1 +
           scores.microtransactionCluster * 0.17 +
           scores.transactionVelocity * 0.1 +
-          scores.beneficiaryRisk * 0.08,
+          scores.beneficiaryRisk * 0.08 +
+          researchScore * 0.12,
       ),
     );
     const unifiedRisk = Math.round(clamp(fraudRisk * 0.42 + amlRisk * 0.58));
@@ -792,6 +826,12 @@ export class AmlService {
       })),
       { feature: "kyc_risk", impact: kycRisk, direction: kycRisk >= 50 ? "risk_increase" as const : "risk_decrease" as const, evidence: `KYC status ${customer?.kycStatus ?? "unknown"} with score ${kycRisk}.` },
       { feature: "kyb_risk", impact: kybRisk, direction: kybRisk >= 50 ? "risk_increase" as const : "risk_decrease" as const, evidence: business ? `KYB status ${business.kybStatus} with score ${kybRisk}.` : "No linked business profile." },
+      ...researchSignals.map((signal) => ({
+        feature: signal.name,
+        impact: signal.score,
+        direction: "risk_increase" as const,
+        evidence: `${signal.paper}: ${signal.evidence.join(" ")}`,
+      })),
     ].sort((a, b) => Math.abs(b.impact) - Math.abs(a.impact)).slice(0, 8);
 
     return {
@@ -812,6 +852,7 @@ export class AmlService {
         ...(this.screeningChecks.some((check) => check.subjectId === transaction.customerId && check.resultStatus === "provider_unavailable") ? ["Screening provider unavailable; manual verification required"] : []),
       ],
       rollingWindows,
+      researchSignals,
     };
   }
 
