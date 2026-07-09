@@ -1,76 +1,49 @@
 # A-Guard
 
-A-Guard is a financial crime defence platform designed to help financial institutions detect, investigate, and prevent fraud, money laundering, and related risks.
-It combines real-time transaction monitoring, behavioural analytics, identity graph intelligence, and automated risk scoring.
-The platform provides investigators with live alerts, case management, payment tracking, AML screening, and evidence-based insights.
-Its AI services support explainable decisions, investigation summaries, SAR preparation, and continuous model improvement.
-A-Guard delivers a unified operational view that strengthens financial crime prevention, regulatory compliance, and institutional collaboration.
+A-Guard is a financial crime defence platform built to help financial institutions detect, investigate, and prevent fraud, money laundering, and related financial risks.
+
+The platform combines real-time transaction monitoring, behavioural analytics, identity graph intelligence, automated risk scoring, and collaborative investigation workflows. It provides investigators with live alerts, case management, payment tracking, AML screening, explainable risk insights, and Financial Crime Copilot capabilities.
+
+A-Guard delivers a unified operational view that strengthens fraud prevention, regulatory compliance, investigative efficiency, and institutional collaboration.
+
+## Core Capabilities
+
+- Real-time fraud and transaction monitoring
+- Automated and explainable risk scoring
+- Behavioural and anomaly analysis
+- AML, sanctions, PEP, and adverse-media screening
+- Identity graph and relationship intelligence
+- Payment route and beneficiary-risk analysis
+- Investigation case management and evidence tracking
+- Suspicious Activity Report preparation
+- Live WebSocket alerts and operational updates
+- Analyst feedback and continuous model improvement
 
 ## Platform Architecture
 
-- `apps/web`: Next.js, TypeScript, Tailwind CSS, Framer Motion, Zustand, and React Query operating console.
-- `services/api`: NestJS API and WebSocket gateway with fraud scoring, payment tracking, cases, intelligence sharing, graph risk, learning feedback, RBAC, rate limiting, and audit primitives.
-- `services/ai`: internal A-Guard Risk Analysis Service used only through the secure API orchestration layer.
-- `infra/k8s`: Kubernetes-ready deployment manifests.
+A-Guard is structured as a production-oriented monorepo:
 
-## Runtime Surfaces
+- `apps/web` — Next.js operating console built with TypeScript, Tailwind CSS, Framer Motion, Zustand, and React Query.
+- `services/api` — NestJS API and WebSocket gateway providing fraud scoring, payment tracking, case management, intelligence sharing, graph-risk analysis, RBAC, rate limiting, and audit controls.
+- `services/ai` — Internal A-Guard Risk Analysis Service supporting hybrid scoring, explainability, investigation summaries, SAR preparation, drift monitoring, and analyst feedback.
+- `infra/k8s` — Kubernetes deployment manifests for containerised environments.
+- `docs` — Architecture, security, and implementation documentation.
 
-The platform simulates the production flow:
+## How It Works
 
-1. Events enter the NestJS API as transactions, logins, device updates, account updates, or beneficiary changes.
-2. The fraud engine combines deterministic rules, anomaly scoring, behavioral profiling, graph risk propagation, and consortium intelligence.
-3. Critical events publish live alerts over WebSockets and can auto-create investigation cases.
-4. The identity graph, payment route, collaboration network, AML convergence, and Financial Crime Copilot views update from the same operating picture.
+1. Transaction, login, device, account, and beneficiary events enter the NestJS API.
+2. The fraud engine evaluates deterministic rules, behavioural profiles, anomaly signals, graph relationships, AML indicators, and consortium intelligence.
+3. High-risk events generate live alerts and may automatically create investigation cases.
+4. Investigators review the shared operating picture across fraud, AML, payments, identity networks, cases, and Financial Crime Copilot workspaces.
+5. Analyst decisions and investigation outcomes are captured to support model monitoring and continuous improvement.
 
 ## Local Development
 
+### Install dependencies
+
 ```bash
 npm ci
+
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r services/ai/requirements.txt
-npm run dev:api
-npm run dev:web
-python -m uvicorn services.ai.app.main:app --reload --host 0.0.0.0 --port 8001
-```
-
-The web app runs at `http://localhost:3000` and calls the same-origin `/api/gateway/*` and `/socket.io/*` paths. The API runs at `http://localhost:4000`. The internal risk service is for local development only and should not be exposed in staging or production.
-
-## Docker
-
-Start the full stack:
-
-```bash
-docker compose up --build
-```
-
-The compose stack includes PostgreSQL, Redis, Kafka, Neo4j, the API, the internal risk service, and the web app. Backing services are placed on the backend network and are not published as public application endpoints.
-
-After changing Dockerfiles, dependencies, or the Next.js build, use a clean rebuild so the browser receives the matching JavaScript and CSS assets:
-
-```bash
-docker compose down --remove-orphans
-docker compose build --no-cache web api ai
-docker compose up
-```
-
-Verify the services:
-
-- Web console: `http://localhost:3000`
-- API health: `http://localhost:4000/v1/health`
-- Internal risk health: available only on the private Docker network.
-- Database, cache, broker, graph, and risk-service ports are not public application surfaces.
-
-Host ports can be changed without editing `docker-compose.yml`. For example, in PowerShell:
-
-```powershell
-$env:WEB_PORT = "3001"
-$env:API_PORT = "4001"
-$env:PUBLIC_API_GATEWAY_URL = "http://api:4000"
-$env:PUBLIC_WS_GATEWAY_URL = "http://api:4000"
-docker compose up --build
-```
-
-When the web image is rebuilt, perform a hard browser refresh (`Ctrl+Shift+R`) to clear references to older Next.js chunks.
-
-Use untracked local environment files for server-only values. Do not commit real connection strings, tokens, private keys, model identifiers, provider credentials, or production hostnames.
