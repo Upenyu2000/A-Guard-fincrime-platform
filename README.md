@@ -1,10 +1,16 @@
-# African Guard
+# A-Guard
 
-African Guard is a FinCrime and fraud defense SaaS platform built as a working monorepo:
+A-Guard is a financial crime defence platform designed to help financial institutions detect, investigate, and prevent fraud, money laundering, and related risks.
+It combines real-time transaction monitoring, behavioural analytics, identity graph intelligence, and automated risk scoring.
+The platform provides investigators with live alerts, case management, payment tracking, AML screening, and evidence-based insights.
+Its AI services support explainable decisions, investigation summaries, SAR preparation, and continuous model improvement.
+A-Guard delivers a unified operational view that strengthens financial crime prevention, regulatory compliance, and institutional collaboration.
+
+## Platform Architecture
 
 - `apps/web`: Next.js, TypeScript, Tailwind CSS, Framer Motion, Zustand, and React Query operating console.
 - `services/api`: NestJS API and WebSocket gateway with fraud scoring, payment tracking, cases, intelligence sharing, graph risk, learning feedback, RBAC, rate limiting, and audit primitives.
-- `services/ai`: internal African Guard Risk Analysis Service used only through the secure API orchestration layer.
+- `services/ai`: internal A-Guard Risk Analysis Service used only through the secure API orchestration layer.
 - `infra/k8s`: Kubernetes-ready deployment manifests.
 
 ## Runtime Surfaces
