@@ -1,0 +1,8 @@
+[allowlist]
+description = "Allow African Guard non-working placeholders only"
+regexes = [
+  '''ci-placeholder-[A-Za-z0-9_-]+''',
+  '''<server-only-[^>]+>''',
+  '''<generate-outside-git>''',
+  '''<server-only-secret>''',
+]

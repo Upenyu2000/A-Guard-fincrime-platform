@@ -74,15 +74,15 @@ export function AmlOverview({ overview }: { overview: AmlOverviewData }) {
           </div>
         </Panel>
         <Panel>
-          <h3 className="mb-3 text-sm font-semibold text-white">Provider status</h3>
+          <h3 className="mb-3 text-sm font-semibold text-white">Controlled source status</h3>
           <div className="grid gap-2">
-            {overview.providerStatuses.map((provider) => (
-              <div key={provider.provider} className="rounded-lg border border-white/10 bg-white/[0.035] px-3 py-2">
+            {overview.providerStatuses.map((source) => (
+              <div key={source.provider} className="rounded-lg border border-white/10 bg-white/[0.035] px-3 py-2">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-medium text-white">{provider.provider}</span>
-                  <span className="text-[10px] uppercase tracking-[0.12em] text-white/35">{provider.status.replaceAll("_", " ")}</span>
+                  <span className="text-xs font-medium text-white">{source.provider}</span>
+                  <span className="text-[10px] uppercase tracking-[0.12em] text-white/35">{source.status.replaceAll("_", " ")}</span>
                 </div>
-                <p className="mt-1 text-xs leading-5 text-white/48">{provider.detail}</p>
+                <p className="mt-1 text-xs leading-5 text-white/48">{source.detail}</p>
               </div>
             ))}
           </div>

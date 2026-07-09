@@ -47,8 +47,8 @@ export function RuleBuilder({
                 </div>
                 <div className="mt-4 grid gap-2 text-xs text-white/55 md:grid-cols-4">
                   <p>Window: {rule.rollingWindow}</p>
-                  <p>Count: {rule.countThreshold}</p>
-                  <p>Cumulative: {rule.cumulativeThreshold}</p>
+                  <p>Count threshold: Restricted</p>
+                  <p>Cumulative threshold: Restricted</p>
                   <p>Contribution: {rule.scoreContribution}</p>
                   <p>Action: {rule.action.replaceAll("_", " ")}</p>
                   <p>Owner: {rule.owner}</p>

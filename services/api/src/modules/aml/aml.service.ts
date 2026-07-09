@@ -87,14 +87,14 @@ export class AmlService {
       overview: this.overview(),
       transactions: this.transactions.slice(0, 50),
       microtransactionClusters: this.microtransactionClusters(),
-      customers: this.customers,
-      businesses: this.businesses,
-      screeningChecks: this.screeningChecks,
-      rules: this.rules,
+      customers: this.customers.map((customer) => this.sanitizeCustomer(customer)),
+      businesses: this.businesses.map((business) => this.sanitizeBusiness(business)),
+      screeningChecks: this.screeningChecks.map((check) => this.sanitizeScreening(check)),
+      rules: this.rules.map((rule) => this.sanitizeRule(rule)),
       alerts: this.alerts,
       investigations: this.investigations,
-      sarDrafts: this.sarDrafts,
-      audit: this.audit.slice(0, 50),
+      sarDrafts: this.sarDrafts.map((draft) => this.sanitizeSarDraft(draft)),
+      audit: this.audit.slice(0, 50).map((event) => this.sanitizeAudit(event)),
       finraCourses,
       researchPaperReviews,
       researchImplementations,
@@ -157,9 +157,9 @@ export class AmlService {
       highestRiskPaymentCorridors: this.corridorPoints().slice(0, 4).map((point) => point.label),
       mostTriggeredScenarios: this.ruleFrequency().slice(0, 5).map((point) => point.label),
       providerStatuses: [
-        { provider: "test-screening-adapter", status: "test_result", detail: "Seeded list only; not a live provider result." },
-        { provider: "mock-pep-adapter", status: "mock_result", detail: "Mock PEP/RCA response for workflow validation." },
-        { provider: "company-registry-adapter", status: "provider_unavailable", detail: "Credentials and live provider connection required." },
+        { provider: "African Guard Screening Network", status: "test_result", detail: "Controlled screening data is available for workflow validation." },
+        { provider: "African Guard Entity Intelligence", status: "manual_verification_required", detail: "Enhanced review is routed through the secure server-side gateway." },
+        { provider: "African Guard Company Intelligence", status: "provider_unavailable", detail: "Live company-data checks require secure server-side configuration." },
       ],
       scenarioCoverage,
     };
@@ -216,8 +216,8 @@ export class AmlService {
     const business = this.businesses.find((item) => item.id === transaction.businessId);
     return {
       transaction,
-      customer,
-      business,
+      customer: customer ? this.sanitizeCustomer(customer) : undefined,
+      business: business ? this.sanitizeBusiness(business) : undefined,
       counterparty: {
         receiver: transaction.receiver,
         beneficiary: transaction.beneficiary,
@@ -283,17 +283,17 @@ export class AmlService {
   }
 
   customersList() {
-    return this.customers;
+    return this.customers.map((customer) => this.sanitizeCustomer(customer));
   }
 
   customer(id: string) {
     const customer = this.customers.find((item) => item.id === id);
     if (!customer) throw new NotFoundException(`Customer ${id} was not found.`);
     return {
-      customer,
+      customer: this.sanitizeCustomer(customer),
       transactions: this.transactions.filter((transaction) => transaction.customerId === id),
       alerts: this.alerts.filter((alert) => alert.subjectId === id),
-      screening: this.screeningChecks.filter((check) => check.subjectId === id),
+      screening: this.screeningChecks.filter((check) => check.subjectId === id).map((check) => this.sanitizeScreening(check)),
     };
   }
 
@@ -308,29 +308,30 @@ export class AmlService {
     customer.lastReviewDate = nowIso();
     customer.nextReviewDate = minutesFromNow(customer.customerRiskScore >= 75 ? 60 * 24 * 30 : 60 * 24 * 180);
     this.auditAction(actor, "aml.kyc.assessed", id, { previous, next: customer.customerRiskScore, reason: "KYC risk recalculated from transaction and screening evidence." });
-    return customer;
+    return this.sanitizeCustomer(customer);
   }
 
   refreshCustomer(id: string, actor: ActorContext) {
     const customer = this.assessCustomer(id, actor);
-    customer.checks = customer.checks.map((check) => ({ ...check, status: check.status === "provider_unavailable" ? "manual_verification_required" : check.status }));
+    const raw = this.customers.find((item) => item.id === id);
+    if (raw) raw.checks = raw.checks.map((check) => ({ ...check, status: check.status === "provider_unavailable" ? "manual_verification_required" : check.status }));
     this.auditAction(actor, "aml.kyc.refresh_requested", id, { reason: "KYC refresh requested by analyst/compliance workflow." });
-    return customer;
+    return this.sanitizeCustomer(raw ?? customer);
   }
 
   businessesList() {
-    return this.businesses;
+    return this.businesses.map((business) => this.sanitizeBusiness(business));
   }
 
   business(id: string) {
     const business = this.businesses.find((item) => item.id === id);
     if (!business) throw new NotFoundException(`Business ${id} was not found.`);
     return {
-      business,
+      business: this.sanitizeBusiness(business),
       transactions: this.transactions.filter((transaction) => transaction.businessId === id),
       alerts: this.alerts.filter((alert) => alert.subjectId === id),
-      screening: this.screeningChecks.filter((check) => check.subjectId === id),
-      graph: business.ownershipGraph,
+      screening: this.screeningChecks.filter((check) => check.subjectId === id).map((check) => this.sanitizeScreening(check)),
+      graph: this.sanitizeBusiness(business).ownershipGraph,
     };
   }
 
@@ -345,50 +346,47 @@ export class AmlService {
     business.lastReviewDate = nowIso();
     business.nextReviewDate = minutesFromNow(business.riskScore >= 75 ? 60 * 24 * 30 : 60 * 24 * 180);
     this.auditAction(actor, "aml.kyb.assessed", id, { previous, next: business.riskScore, reason: "KYB risk recalculated from transaction volume and ownership indicators." });
-    return business;
+    return this.sanitizeBusiness(business);
   }
 
   refreshBusiness(id: string, actor: ActorContext) {
     const business = this.assessBusiness(id, actor);
     this.auditAction(actor, "aml.kyb.refresh_requested", id, { reason: "KYB refresh requested by analyst/compliance workflow." });
-    return business;
+    return this.sanitizeBusiness(business);
   }
 
   createScreening(dto: ScreeningRequestDto, actor: ActorContext) {
-    const provider = dto.provider ?? "manual-screening-adapter";
     const check: ScreeningCheck = {
       id: `scr-${randomUUID().slice(0, 8)}`,
       subjectId: dto.subjectId,
       subjectType: dto.subjectType,
       checkType: dto.checkType,
-      provider,
-      resultStatus: provider.includes("live") ? "provider_unavailable" : "manual_verification_required",
-      datasetVersion: provider.includes("live") ? "provider-not-connected" : "manual",
+      provider: "African Guard Screening Network",
+      resultStatus: "manual_verification_required",
+      datasetVersion: "AG-SCREENING-CONTROLLED",
       checkedAt: nowIso(),
       matchScore: 0,
       matchingFields: [],
       disposition: "needs_review",
       reviewer: actor.actor,
       evidence: [
-        provider.includes("live")
-          ? "Live provider credentials are not connected. No live screening result was performed."
-          : "Manual verification is required before disposition.",
+        "Manual verification is required before disposition.",
       ],
       nextReviewDate: minutesFromNow(60 * 24 * 7),
     };
     this.screeningChecks.unshift(check);
     this.auditAction(actor, "aml.screening.requested", check.id, { reason: `Requested ${dto.checkType} screening for ${dto.subjectId}.` });
-    return check;
+    return this.sanitizeScreening(check);
   }
 
   screening(id: string) {
     const check = this.screeningChecks.find((item) => item.id === id);
     if (!check) throw new NotFoundException(`Screening check ${id} was not found.`);
-    return check;
+    return this.sanitizeScreening(check);
   }
 
   rulesList() {
-    return this.rules;
+    return this.rules.map((rule) => this.sanitizeRule(rule));
   }
 
   createRule(dto: CreateAmlRuleDto, actor: ActorContext) {
@@ -425,7 +423,7 @@ export class AmlService {
     };
     this.rules.unshift(rule);
     this.auditAction(actor, "aml.rule.created", rule.id, { previous: null, next: rule, reason: dto.reason ?? "Rule created." });
-    return rule;
+    return this.sanitizeRule(rule);
   }
 
   patchRule(id: string, dto: PatchAmlRuleDto, actor: ActorContext) {
@@ -444,7 +442,7 @@ export class AmlService {
     });
     rule.versionHistory.unshift({ version: rule.version, changedAt: nowIso(), changedBy: actor.actor, reason: dto.reason ?? "Rule edited." });
     this.auditAction(actor, "aml.rule.edited", id, { previous, next: rule, reason: dto.reason ?? "Rule edited." });
-    return rule;
+    return this.sanitizeRule(rule);
   }
 
   testRule(id: string) {
@@ -470,29 +468,29 @@ export class AmlService {
       lastBacktestedAt: nowIso(),
     };
     this.auditAction(actor, "aml.rule.backtested", id, { next: rule.performance, reason: "Backtest completed against seeded transaction history." });
-    return { rule, result };
+    return { rule: this.sanitizeRule(rule), result };
   }
 
   approveRule(id: string, actor: ActorContext) {
     const rule = this.requireRule(id);
     if (rule.owner === actor.actor && actor.role === "rule_administrator") {
-      return { rule, message: "Four-eyes review required: rule administrators cannot approve their own rule." };
+      return { rule: this.sanitizeRule(rule), message: "Four-eyes review required: rule administrators cannot approve their own rule." };
     }
     const previous = structuredClone(rule);
     rule.approvalStatus = "approved";
     rule.productionStatus = "approved";
     rule.versionHistory.unshift({ version: rule.version, changedAt: nowIso(), changedBy: actor.actor, reason: "Rule approved through four-eyes review." });
     this.auditAction(actor, "aml.rule.approved", id, { previous, next: rule, reason: "Four-eyes approval completed." });
-    return { rule, message: "Rule approved." };
+    return { rule: this.sanitizeRule(rule), message: "Rule approved." };
   }
 
   activateRule(id: string, actor: ActorContext) {
     const rule = this.requireRule(id);
     const previous = structuredClone(rule);
-    if (rule.approvalStatus !== "approved") return { rule, message: "Rule must be approved before activation." };
+    if (rule.approvalStatus !== "approved") return { rule: this.sanitizeRule(rule), message: "Rule must be approved before activation." };
     rule.productionStatus = "active";
     this.auditAction(actor, "aml.rule.activated", id, { previous, next: rule, reason: "Rule activated." });
-    return { rule, message: "Rule activated." };
+    return { rule: this.sanitizeRule(rule), message: "Rule activated." };
   }
 
   deactivateRule(id: string, actor: ActorContext) {
@@ -500,7 +498,7 @@ export class AmlService {
     const previous = structuredClone(rule);
     rule.productionStatus = "inactive";
     this.auditAction(actor, "aml.rule.deactivated", id, { previous, next: rule, reason: "Rule deactivated." });
-    return { rule, message: "Rule deactivated." };
+    return { rule: this.sanitizeRule(rule), message: "Rule deactivated." };
   }
 
   alertsList() {
@@ -584,7 +582,7 @@ export class AmlService {
   }
 
   sarDraftsList() {
-    return this.sarDrafts;
+    return this.sarDrafts.map((draft) => this.sanitizeSarDraft(draft));
   }
 
   createSarDraft(dto: CreateSarDraftDto, actor: ActorContext) {
@@ -601,7 +599,7 @@ export class AmlService {
       transactionChronology: transactions.map((transaction) => `${transaction.timestamp}: ${transaction.id} ${transaction.currency} ${transaction.amount} ${transaction.sender} to ${transaction.receiver}`),
       totalSuspiciousValue: this.sum(transactions),
       suspicionIndicators: investigation.findings,
-      reasonForSuspicion: `AI-generated draft requiring human validation. ${investigation.hypothesis}`,
+      reasonForSuspicion: `Decision Intelligence draft requiring human validation. ${investigation.hypothesis}`,
       paymentCorridors: [...new Set(transactions.map((transaction) => `${transaction.originCountry}-${transaction.destinationCountry}`))],
       sourceOfFundsConcerns: [investigation.sourceOfFundsAnalysis],
       relatedEntities: investigation.linkedEntities,
@@ -610,7 +608,7 @@ export class AmlService {
       glossaryCategories: ["AML", "transaction monitoring", "microtransaction intelligence"],
       investigator: actor.actor,
       mlroReviewStatus: "ready_for_review",
-      narrative: `AI-generated draft requiring human validation. ${investigation.hypothesis} Supporting evidence: ${investigation.findings.join("; ")}.`,
+      narrative: `Decision Intelligence draft requiring human validation. ${investigation.hypothesis} Supporting evidence: ${investigation.findings.join("; ")}.`,
       aiGenerated: true,
       tippingOffControls: ["No customer-facing notes", "Restricted export", "Manual submission only", "Versioned edits after approval"],
       version: 1,
@@ -619,7 +617,7 @@ export class AmlService {
     };
     this.sarDrafts.unshift(draft);
     this.auditAction(actor, "aml.sar.generated", draft.id, { reason: dto.reason ?? "SAR draft generated for MLRO review.", relatedCase: investigation.id });
-    return draft;
+    return this.sanitizeSarDraft(draft);
   }
 
   approveSarDraft(id: string, dto: AmlActionReasonDto, actor: ActorContext) {
@@ -630,11 +628,11 @@ export class AmlService {
     draft.approvedBy = actor.actor;
     draft.updatedAt = nowIso();
     this.auditAction(actor, "aml.sar.approved", id, { previous, next: draft, reason: dto.reason ?? "SAR draft approved by authorised reviewer." });
-    return draft;
+    return this.sanitizeSarDraft(draft);
   }
 
   auditList() {
-    return this.audit.slice(0, 100);
+    return this.audit.slice(0, 100).map((event) => this.sanitizeAudit(event));
   }
 
   finraCourseList() {
@@ -677,6 +675,20 @@ export class AmlService {
       screening: this.screeningChecks.find((check) => check.disposition === "true_match" || check.disposition === "possible_match") ?? this.screeningChecks[0],
       case: this.investigations.find((investigation) => investigation.status === "mlro_review") ?? this.investigations[0],
       sar: this.sarDrafts.find((draft) => draft.mlroReviewStatus === "ready_for_review") ?? this.sarDrafts[0],
+    };
+  }
+
+  sanitizeRealtimeEvent(aml: ReturnType<AmlService["evaluateSyntheticStreamEvent"]>) {
+    return {
+      transaction: aml.transaction,
+      alert: aml.alert,
+      clusters: aml.clusters,
+      overview: aml.overview,
+      customer: aml.customer ? this.sanitizeCustomer(aml.customer) : undefined,
+      business: aml.business ? this.sanitizeBusiness(aml.business) : undefined,
+      screening: aml.screening ? this.sanitizeScreening(aml.screening) : undefined,
+      case: aml.case,
+      sar: aml.sar ? this.sanitizeSarDraft(aml.sar) : undefined,
     };
   }
 
@@ -843,13 +855,13 @@ export class AmlService {
       reasons: [...new Set([...rulesTriggered, ...fraudDecision.reasons, ...relatedClusters.map((cluster) => cluster.scenario)])].slice(0, 8),
       componentScores: scores,
       explainability,
-      policyVersion: "african-guard-aml-policy-v1",
-      modelVersion: fraudDecision.explainability.model_version,
+      policyVersion: "AG-POLICY-AML-1.4",
+      modelVersion: "AG-RISK-2026.1",
       confidence: Math.round(clamp(70 + explainability.length * 2 + relatedClusters.length * 4)),
       dataQualityWarnings: [
         ...(customer ? [] : ["No KYC profile found for customer"]),
         ...(transaction.businessId && !business ? ["No KYB profile found for business"] : []),
-        ...(this.screeningChecks.some((check) => check.subjectId === transaction.customerId && check.resultStatus === "provider_unavailable") ? ["Screening provider unavailable; manual verification required"] : []),
+        ...(this.screeningChecks.some((check) => check.subjectId === transaction.customerId && check.resultStatus === "provider_unavailable") ? ["Screening source unavailable; manual verification required"] : []),
       ],
       rollingWindows,
       researchSignals,
@@ -1021,6 +1033,148 @@ export class AmlService {
     const counts = new Map<string, number>();
     for (const investigation of this.investigations) counts.set(investigation.owner, (counts.get(investigation.owner) ?? 0) + 1);
     return [...counts.entries()].map(([label, value]) => ({ label, value }));
+  }
+
+  private sanitizeCustomer(customer: CustomerKycProfile): CustomerKycProfile {
+    const sanitized = structuredClone(customer);
+    sanitized.fullLegalName = this.maskName(customer.fullLegalName);
+    sanitized.previousNames = [];
+    sanitized.dateOfBirth = this.maskDate(customer.dateOfBirth);
+    sanitized.residentialAddress = "Restricted - audited reveal required";
+    sanitized.telephoneNumber = this.maskPhone(customer.telephoneNumber);
+    sanitized.emailAddress = this.maskEmail(customer.emailAddress);
+    sanitized.employer = "Restricted - audited reveal required";
+    sanitized.sourceOfFunds = "Restricted - permissioned review required";
+    sanitized.sourceOfWealth = "Restricted - permissioned review required";
+    sanitized.deviceInformation = customer.deviceInformation.map((device) => this.maskIdentifier(device));
+    sanitized.edd = {
+      ...sanitized.edd,
+      supportingDocuments: sanitized.edd.supportingDocuments.map((document) => `${document} (restricted evidence)`),
+      investigatorNotes: sanitized.edd.investigatorNotes.map(() => "Restricted investigation note"),
+    };
+    sanitized.checks = sanitized.checks.map((check) => ({
+      ...check,
+      evidence: this.safeEvidence(check.evidence),
+    }));
+    return sanitized;
+  }
+
+  private sanitizeBusiness(business: BusinessKybProfile): BusinessKybProfile {
+    const sanitized = structuredClone(business);
+    sanitized.legalName = this.maskName(business.legalName);
+    sanitized.companyNumber = this.maskIdentifier(business.companyNumber);
+    sanitized.registeredAddress = "Restricted - audited reveal required";
+    sanitized.tradingAddress = "Restricted - audited reveal required";
+    sanitized.website = business.website ? "Restricted - server-side KYB evidence" : "";
+    sanitized.emailDomain = "restricted-domain";
+    sanitized.directors = business.directors.map((director) => ({ ...director, name: this.maskName(director.name) }));
+    sanitized.shareholders = business.shareholders.map((shareholder) => ({ ...shareholder, name: this.maskName(shareholder.name) }));
+    sanitized.ultimateBeneficialOwners = business.ultimateBeneficialOwners.map((owner) => ({ ...owner, name: this.maskName(owner.name) }));
+    sanitized.parentEntities = business.parentEntities.map((entity) => this.maskName(entity));
+    sanitized.subsidiaries = business.subsidiaries.map((entity) => this.maskName(entity));
+    sanitized.sourceOfBusinessFunds = "Restricted - permissioned review required";
+    sanitized.licences = business.licences.map((licence) => this.maskIdentifier(licence));
+    sanitized.taxInformation = "Restricted - audited reveal required";
+    sanitized.ownershipGraph = {
+      nodes: business.ownershipGraph.nodes.map((node) => ({
+        ...node,
+        label: ["director", "shareholder", "ubo", "address"].includes(node.type) ? "Restricted entity" : node.label,
+      })),
+      edges: business.ownershipGraph.edges,
+    };
+    return sanitized;
+  }
+
+  private sanitizeScreening(check: ScreeningCheck): ScreeningCheck {
+    return {
+      ...structuredClone(check),
+      provider: "African Guard Screening Network",
+      datasetVersion: "AG-SCREENING-CONTROLLED",
+      reviewer: check.reviewer ? this.maskIdentifier(check.reviewer) : undefined,
+      evidence: check.evidence.map((item) => this.safeEvidence(item)),
+    };
+  }
+
+  private sanitizeRule(rule: AmlRule): AmlRule {
+    const sanitized = structuredClone(rule);
+    sanitized.comparisonValue = "restricted";
+    sanitized.countThreshold = 0;
+    sanitized.cumulativeThreshold = 0;
+    sanitized.logic = {
+      join: sanitized.logic.join,
+      conditions: sanitized.logic.conditions.map((condition) => ({
+        ...condition,
+        value: "restricted",
+      })),
+    };
+    sanitized.versionHistory = sanitized.versionHistory.map((entry) => ({
+      ...entry,
+      changedBy: this.maskIdentifier(entry.changedBy),
+    }));
+    return sanitized;
+  }
+
+  private sanitizeSarDraft(draft: SarDraft): SarDraft {
+    const sanitized = structuredClone(draft);
+    sanitized.accountIds = draft.accountIds.map((account) => this.maskIdentifier(account));
+    sanitized.walletIds = draft.walletIds.map((wallet) => this.maskIdentifier(wallet));
+    sanitized.transactionChronology = ["Restricted chronology - available only through audited SAR review."];
+    sanitized.reasonForSuspicion = "Restricted SAR rationale - available only to authorised SAR reviewers.";
+    sanitized.sourceOfFundsConcerns = ["Restricted source-of-funds analysis - permissioned review required."];
+    sanitized.relatedEntities = draft.relatedEntities.map((entity) => this.maskIdentifier(entity));
+    sanitized.narrative = "Restricted SAR narrative. Open an authorised SAR review workflow to view or edit the full draft.";
+    sanitized.approvedBy = draft.approvedBy ? this.maskIdentifier(draft.approvedBy) : undefined;
+    return sanitized;
+  }
+
+  private sanitizeAudit(event: AuditEvent): AuditEvent {
+    return {
+      ...event,
+      actor: this.maskIdentifier(event.actor),
+      metadata: Object.fromEntries(
+        Object.entries(event.metadata).map(([key, value]) => {
+          if (["previous", "next", "narrative", "prompt", "providerPayload"].includes(key)) return [key, "[restricted]"];
+          if (typeof value === "string") return [key, this.safeEvidence(value)];
+          return [key, value];
+        }),
+      ),
+    };
+  }
+
+  private maskName(value: string) {
+    return value
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((part) => `${part.slice(0, 1)}${"*".repeat(Math.min(Math.max(part.length - 1, 2), 8))}`)
+      .join(" ");
+  }
+
+  private maskEmail(value: string) {
+    const [local, domain] = value.split("@");
+    return `${local?.slice(0, 1) || "u"}***@${domain || "restricted.example"}`;
+  }
+
+  private maskPhone(value: string) {
+    return value.startsWith("+") ? "+*** *** ***" : "*** *** ***";
+  }
+
+  private maskDate(value: string) {
+    const year = value.slice(0, 4);
+    return year ? `${year}-**-**` : "****-**-**";
+  }
+
+  private maskIdentifier(value: string) {
+    if (!value) return "restricted";
+    return value.length <= 4 ? "****" : `****${value.slice(-4)}`;
+  }
+
+  private safeEvidence(value: string) {
+    return value
+      .replace(/provider/gi, "screening source")
+      .replace(/adapter/gi, "connector")
+      .replace(/credentials?/gi, "secure configuration")
+      .replace(/AI-generated/gi, "Decision Intelligence")
+      .replace(/hybrid-risk-[\w.-]+/gi, "AG-RISK-2026.1");
   }
 
   private mergeClusters(seed: MicrotransactionCluster[], detected: MicrotransactionCluster[]) {

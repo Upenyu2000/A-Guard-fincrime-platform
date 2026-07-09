@@ -19,6 +19,12 @@ spec:
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8001
+          env:
+            - name: AI_SERVICE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: african-guard-secrets
+                  key: ai-service-token
           readinessProbe:
             httpGet:
               path: /health
@@ -39,9 +45,30 @@ metadata:
   name: african-guard-ai
   namespace: african-guard
 spec:
+  type: ClusterIP
   selector:
     app: african-guard-ai
   ports:
     - name: http
       port: 8001
       targetPort: 8001
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: african-guard-ai-ingress
+  namespace: african-guard
+spec:
+  podSelector:
+    matchLabels:
+      app: african-guard-ai
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: african-guard-api
+      ports:
+        - protocol: TCP
+          port: 8001

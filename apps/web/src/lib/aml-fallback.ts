@@ -4,7 +4,7 @@ export const fallbackAmlWorkspace: AmlWorkspaceSnapshot = {
   overview: {
     metrics: [
       { label: "Transactions monitored today", value: 0, format: "number" },
-      { label: "Provider unavailable", value: 1, format: "number", risk: "medium" },
+      { label: "Secure source unavailable", value: 1, format: "number", risk: "medium" },
     ],
     alertVolumeOverTime: [],
     riskDistribution: [],
@@ -21,7 +21,7 @@ export const fallbackAmlWorkspace: AmlWorkspaceSnapshot = {
     highestRiskPaymentCorridors: [],
     mostTriggeredScenarios: [],
     providerStatuses: [
-      { provider: "African Guard API", status: "provider_unavailable", detail: "The AML API is unavailable; showing an empty safe state." },
+      { provider: "African Guard Secure Gateway", status: "provider_unavailable", detail: "The AML workspace source is unavailable; showing an empty safe state." },
     ],
     scenarioCoverage: [],
   },

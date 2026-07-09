@@ -33,11 +33,37 @@ spec:
                   name: african-guard-secrets
                   key: redis-url
             - name: KAFKA_BROKERS
-              value: kafka:9092
+              valueFrom:
+                secretKeyRef:
+                  name: african-guard-secrets
+                  key: kafka-brokers
             - name: NEO4J_URI
-              value: bolt://neo4j:7687
+              valueFrom:
+                secretKeyRef:
+                  name: african-guard-secrets
+                  key: neo4j-uri
             - name: AI_SERVICE_URL
-              value: http://african-guard-ai:8001
+              valueFrom:
+                secretKeyRef:
+                  name: african-guard-secrets
+                  key: ai-service-url
+            - name: AI_SERVICE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: african-guard-secrets
+                  key: ai-service-token
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: african-guard-secrets
+                  key: jwt-secret
+            - name: CONSORTIUM_SHARED_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: african-guard-secrets
+                  key: consortium-shared-secret
+            - name: ALLOW_DEV_HEADER_AUTH
+              value: "false"
           readinessProbe:
             httpGet:
               path: /v1/health
@@ -58,6 +84,7 @@ metadata:
   name: african-guard-api
   namespace: african-guard
 spec:
+  type: ClusterIP
   selector:
     app: african-guard-api
   ports:

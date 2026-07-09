@@ -2,10 +2,8 @@ import { fallbackAmlWorkspace } from "./aml-fallback";
 import { AmlTransactionDetail, AmlWorkspaceSnapshot } from "./aml-types";
 import { API_URL } from "./api";
 
-const headers = (role = "compliance_officer") => ({
+const headers = () => ({
   "content-type": "application/json",
-  "x-role": role,
-  "x-actor": "aml.console.user",
 });
 
 async function json<T>(path: string, init?: RequestInit): Promise<T> {
@@ -102,7 +100,7 @@ export async function refreshKyb(id: string) {
 export async function runScreening(subjectId: string, subjectType: "customer" | "business", checkType = "sanctions") {
   return json("/aml/screening", {
     method: "POST",
-    body: JSON.stringify({ subjectId, subjectType, checkType, provider: "manual-screening-adapter" }),
+    body: JSON.stringify({ subjectId, subjectType, checkType }),
   });
 }
 
@@ -113,7 +111,6 @@ export async function backtestRule(id: string) {
 export async function createAmlRule() {
   return json("/aml/rules", {
     method: "POST",
-    headers: headers("rule_administrator"),
     body: JSON.stringify({
       name: `Console draft rule ${Math.round(Math.random() * 9000)}`,
       description: "Draft configurable rule created from the AML workspace for four-eyes review.",
@@ -132,24 +129,23 @@ export async function createAmlRule() {
 }
 
 export async function approveRule(id: string) {
-  return json(`/aml/rules/${id}/approve`, { method: "POST", headers: headers("compliance_officer") });
+  return json(`/aml/rules/${id}/approve`, { method: "POST" });
 }
 
 export async function activateRule(id: string) {
-  return json(`/aml/rules/${id}/activate`, { method: "POST", headers: headers("compliance_officer") });
+  return json(`/aml/rules/${id}/activate`, { method: "POST" });
 }
 
 export async function createSarDraft(caseId: string) {
   return json("/aml/sar-drafts", {
     method: "POST",
-    body: JSON.stringify({ caseId, reason: "Prepared from AML workspace. AI narrative requires human validation." }),
+    body: JSON.stringify({ caseId, reason: "Prepared from AML workspace. Decision Intelligence narrative requires human validation." }),
   });
 }
 
 export async function approveSarDraft(id: string) {
   return json(`/aml/sar-drafts/${id}/approve`, {
     method: "POST",
-    headers: headers("mlro"),
     body: JSON.stringify({ reason: "Approved by MLRO-equivalent local-development role." }),
   });
 }

@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",
     "test:aml": "ts-node -r tsconfig-paths/register src/modules/aml/microtransaction-detector.spec.ts",
+    "test:security": "ts-node -r tsconfig-paths/register src/modules/security/security-hardening.spec.ts",
     "prisma:generate": "prisma generate"
   },
   "dependencies": {

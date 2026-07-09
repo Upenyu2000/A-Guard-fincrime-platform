@@ -25,12 +25,12 @@ export function ScreeningWorkspace({
       <Panel>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-white">Provider-independent screening</h2>
-            <p className="mt-1 text-sm text-white/48">Results are labelled as live, test, mock, manual, unavailable, or not completed.</p>
+            <h2 className="text-lg font-semibold text-white">Controlled screening</h2>
+            <p className="mt-1 text-sm text-white/48">Results show check type, confidence, matching fields, disposition, and required reviewer action.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            {firstCustomerId ? <button className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/70" onClick={() => onRunCustomer(firstCustomerId)}>Run customer test</button> : null}
-            {firstBusinessId ? <button className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/70" onClick={() => onRunBusiness(firstBusinessId)}>Run business test</button> : null}
+            {firstCustomerId ? <button className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/70" onClick={() => onRunCustomer(firstCustomerId)}>Run customer check</button> : null}
+            {firstBusinessId ? <button className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/70" onClick={() => onRunBusiness(firstBusinessId)}>Run business check</button> : null}
           </div>
         </div>
       </Panel>
@@ -46,12 +46,12 @@ export function ScreeningWorkspace({
                     <ShieldQuestion className="h-4 w-4 text-guard-teal" />
                     <h3 className="font-semibold text-white">{check.checkType.replaceAll("_", " ")}</h3>
                   </div>
-                  <p className="mt-1 text-xs text-white/42">{check.subjectType} · {check.subjectId} · {check.provider}</p>
+                  <p className="mt-1 text-xs text-white/42">{check.subjectType} - {check.subjectId} - controlled source</p>
                 </div>
                 <StatusPill tone={tone}>{check.disposition.replaceAll("_", " ")}</StatusPill>
               </div>
               <div className="mt-4 grid gap-2 text-xs text-white/55 sm:grid-cols-2">
-                <p>Dataset: {check.datasetVersion}</p>
+                <p>Source: Controlled screening result</p>
                 <p>Result: {check.resultStatus.replaceAll("_", " ")}</p>
                 <p>Match score: {Math.round(check.matchScore)}</p>
                 <p>Checked: {timeAgo(check.checkedAt)} ago</p>

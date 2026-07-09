@@ -8,9 +8,7 @@ from services.ai.app.main import BehaviourSignals, ScoreRequest, health, score
 
 def test_health_contract() -> None:
     payload = health()
-    assert payload["status"] == "ok"
-    assert payload["service"] == "african-guard-ai"
-    assert "model" in payload
+    assert payload == {"status": "ok"}
 
 
 def test_sanctions_hit_blocks_and_explains() -> None:

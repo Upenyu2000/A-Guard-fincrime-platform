@@ -339,9 +339,9 @@ function DisputesAndRules({ picture }: { picture: OperatingPicture }) {
             <SlidersHorizontal className="h-4 w-4 text-fuchsia-200" aria-hidden />
             <p className="text-sm font-medium text-white">{rule.name}</p>
           </div>
-          <code className="mt-3 block whitespace-pre-wrap rounded-md border border-white/10 bg-black/26 p-2 text-xs leading-5 text-fuchsia-100">
+          <p className="mt-3 block whitespace-pre-wrap rounded-md border border-white/10 bg-black/26 p-2 text-xs leading-5 text-fuchsia-100">
             {rule.logic}
-          </code>
+          </p>
           <p className="mt-2 text-xs leading-5 text-white/52">{rule.backtestSummary}</p>
         </div>
       ) : null}

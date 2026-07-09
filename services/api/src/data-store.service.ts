@@ -107,7 +107,7 @@ export class DataStoreService {
       metrics: { ...this.metrics },
       alerts: this.alerts.slice(0, 12),
       payments: this.payments,
-      cases: this.cases,
+      cases: this.cases.map((item) => this.sanitizeCase(item)),
       institutions: this.institutions,
       typologies: this.typologies,
       heatmap: this.heatmap,
@@ -116,7 +116,7 @@ export class DataStoreService {
       amlCustomers: this.amlCustomers,
       amlKycMandate: this.amlKycMandate,
       learning: { ...this.learning },
-      audit: this.audit.slice(0, 12),
+      audit: this.audit.slice(0, 12).map((item) => this.sanitizeAudit(item)),
       agenticOperations: this.agenticOperations(),
     };
   }
@@ -281,7 +281,7 @@ export class DataStoreService {
   }
 
   updateCaseStatus(id: string, status: CaseStatus, actor: string, role: UserRole) {
-    const investigationCase = this.caseById(id);
+    const investigationCase = this.requireCase(id);
     investigationCase.status = status;
     investigationCase.updatedAt = nowIso();
     investigationCase.timeline.unshift({
@@ -291,17 +291,15 @@ export class DataStoreService {
       detail: `Case moved to ${status}.`,
     });
     this.audit.unshift(this.security.audit(actor, role, "case.status.updated", id, { status }));
-    return investigationCase;
+    return this.sanitizeCase(investigationCase);
   }
 
   caseById(id: string) {
-    const investigationCase = this.cases.find((item) => item.id === id);
-    if (!investigationCase) throw new NotFoundException(`Case ${id} was not found.`);
-    return investigationCase;
+    return this.sanitizeCase(this.requireCase(id));
   }
 
   copilot(caseId: string) {
-    const investigationCase = this.caseById(caseId);
+    const investigationCase = this.requireCase(caseId);
     const relatedNodes = this.graphNodes.filter((node) => investigationCase.entities.includes(node.id));
     const relatedEdges = this.graphEdges.filter(
       (edge) =>
@@ -317,7 +315,7 @@ export class DataStoreService {
         edges: relatedEdges,
       },
       suggestedActions: investigationCase.nextActions,
-      sarDraft: investigationCase.sarDraft,
+      sarDraft: this.restrictedSarText(),
       confidence: Math.round(
         investigationCase.evidence.reduce((sum, item) => sum + item.confidence, 0) /
           Math.max(investigationCase.evidence.length, 1),
@@ -326,7 +324,7 @@ export class DataStoreService {
   }
 
   chat(caseId: string, prompt: string) {
-    const investigationCase = this.caseById(caseId);
+    const investigationCase = this.requireCase(caseId);
     const normalized = prompt.toLowerCase();
     if (normalized.includes("why") || normalized.includes("flagged")) {
       return {
@@ -346,7 +344,7 @@ export class DataStoreService {
 
     if (normalized.includes("sar") || normalized.includes("report")) {
       return {
-        answer: investigationCase.sarDraft,
+        answer: this.restrictedSarText(),
         citations: ["sar_draft", "case_timeline"],
       };
     }
@@ -363,7 +361,7 @@ export class DataStoreService {
     analyst: string;
     notes: string;
   }) {
-    const investigationCase = this.caseById(input.caseId);
+    const investigationCase = this.requireCase(input.caseId);
     this.learning.labelledCases += 1;
     this.learning.feedbackQueue += 1;
 
@@ -393,7 +391,7 @@ export class DataStoreService {
 
     return {
       learning: this.learning,
-      case: investigationCase,
+      case: this.sanitizeCase(investigationCase),
       retrainingQueued: this.learning.feedbackQueue >= 25,
     };
   }
@@ -454,6 +452,41 @@ export class DataStoreService {
         failed_logins_10m: eventType === "login" && criticalBias ? 4 + Math.round(Math.random() * 6) : 0,
       },
     };
+  }
+
+  private requireCase(id: string) {
+    const investigationCase = this.cases.find((item) => item.id === id);
+    if (!investigationCase) throw new NotFoundException(`Case ${id} was not found.`);
+    return investigationCase;
+  }
+
+  private sanitizeCase(investigationCase: InvestigationCase): InvestigationCase {
+    return {
+      ...structuredClone(investigationCase),
+      sarDraft: this.restrictedSarText(),
+    };
+  }
+
+  private sanitizeAudit(event: AuditEvent): AuditEvent {
+    return {
+      ...event,
+      actor: this.maskIdentifier(event.actor),
+      metadata: Object.fromEntries(
+        Object.entries(event.metadata).map(([key, value]) => {
+          if (["previous", "next", "prompt", "narrative", "providerPayload"].includes(key)) return [key, "[restricted]"];
+          return [key, value];
+        }),
+      ),
+    };
+  }
+
+  private restrictedSarText() {
+    return "Restricted SAR content. Open an authorised SAR review workflow to view or edit the draft.";
+  }
+
+  private maskIdentifier(value: string) {
+    if (!value) return "restricted";
+    return value.length <= 4 ? "****" : `****${value.slice(-4)}`;
   }
 
   private selectAgent(agentId: string | undefined, prompt: string): AgentCapability {

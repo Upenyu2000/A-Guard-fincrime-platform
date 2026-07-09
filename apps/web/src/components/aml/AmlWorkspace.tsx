@@ -86,7 +86,7 @@ export function AmlWorkspace({ initialTab = "overview" }: { initialTab?: AmlTabI
   const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
   const workspaceQuery = useQuery({ queryKey: ["aml-workspace"], queryFn: fetchAmlWorkspace });
   const workspace = workspaceQuery.data ?? fallbackAmlWorkspace;
-  const isFallback = workspace === fallbackAmlWorkspace || workspace.overview.providerStatuses.some((provider) => provider.status === "provider_unavailable");
+  const isFallback = workspace === fallbackAmlWorkspace || workspace.overview.providerStatuses.some((source) => source.status === "provider_unavailable");
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ["aml-workspace"] });
@@ -222,7 +222,7 @@ export function AmlWorkspace({ initialTab = "overview" }: { initialTab?: AmlTabI
             {isFallback ? (
               <div className="mt-4 flex items-start gap-2 rounded-lg border border-amber-300/20 bg-amber-400/10 p-3 text-xs leading-5 text-amber-100/75">
                 <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                Some provider or API data is unavailable. The workspace is displaying safe fallback/test data and labels screening results accordingly.
+                Some screening or API data is unavailable. The workspace is displaying safe fallback data and labels screening results accordingly.
               </div>
             ) : null}
           </motion.div>

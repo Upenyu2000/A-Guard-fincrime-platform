@@ -922,7 +922,7 @@ export const sarDrafts: SarDraft[] = [
     transactionChronology: ["txn-sanction-test-001 attempted outbound transfer and was held."],
     totalSuspiciousValue: 6900,
     suspicionIndicators: ["High-confidence seeded sanctions test match", "Source-of-wealth gap", "Outbound transfer attempt"],
-    reasonForSuspicion: "AI-generated draft: the available evidence indicates a possible sanctions-related suspicious activity pattern requiring human validation.",
+    reasonForSuspicion: "Decision Intelligence draft: the available evidence indicates a possible sanctions-related suspicious activity pattern requiring human validation.",
     paymentCorridors: ["ZA-KE"],
     sourceOfFundsConcerns: ["Consulting invoices have not independently validated observed activity."],
     relatedEntities: ["counterparty-screening-hit"],
@@ -932,7 +932,7 @@ export const sarDrafts: SarDraft[] = [
     investigator: "mlro.user",
     mlroReviewStatus: "ready_for_review",
     narrative:
-      "AI-generated draft requiring human validation. Seeded test screening produced a high-confidence sanctions match for cust-sanction-901, followed by an attempted outbound transfer. The transfer was held and the matter requires nominated-officer review.",
+      "Decision Intelligence draft requiring human validation. Seeded test screening produced a high-confidence sanctions match for cust-sanction-901, followed by an attempted outbound transfer. The transfer was held and the matter requires nominated-officer review.",
     aiGenerated: true,
     tippingOffControls: ["No customer-facing note", "Restricted export", "Versioned edits after approval", "Manual submission only"],
     version: 1,

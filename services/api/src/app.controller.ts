@@ -1,17 +1,17 @@
-import { Body, Controller, Get, Headers, Param, Post } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, Req } from "@nestjs/common";
 import { DataStoreService } from "./data-store.service";
 import { FraudEventInput, CaseStatus, UserRole } from "./domain";
 import { FraudEngineService } from "./modules/fraud/fraud-engine.service";
+import { AuthenticatedUser } from "./modules/security/rbac.guard";
 import { Roles } from "./modules/security/roles.decorator";
 
-const actorFrom = (headers: Record<string, string | string[] | undefined>) => {
-  const value = headers["x-actor"];
-  return Array.isArray(value) ? value[0] ?? "local-user" : value ?? "local-user";
+type RequestWithUser = {
+  user?: AuthenticatedUser;
 };
 
-const roleFrom = (headers: Record<string, string | string[] | undefined>) => {
-  const value = headers["x-role"];
-  return ((Array.isArray(value) ? value[0] : value) ?? "admin") as UserRole;
+const actorFrom = (request: RequestWithUser) => request.user?.actor ?? "system";
+const roleFrom = (request: RequestWithUser) => {
+  return (request.user?.role ?? "admin") as UserRole;
 };
 
 @Controller()
@@ -23,15 +23,11 @@ export class AppController {
 
   @Get("health")
   health() {
-    return {
-      status: "ok",
-      service: "african-guard-api",
-      architecture: ["NestJS", "WebSockets", "Prisma", "Redis", "Kafka", "Neo4j"],
-      timestamp: new Date().toISOString(),
-    };
+    return { status: "ok" };
   }
 
   @Get("operating-picture")
+  @Roles("analyst", "fraud_investigator", "compliance_officer", "mlro", "internal_auditor", "admin", "institution_partner")
   operatingPicture() {
     return this.dataStore.operatingPicture();
   }
@@ -49,6 +45,7 @@ export class AppController {
   }
 
   @Get("intelligence/network")
+  @Roles("fraud_investigator", "compliance_officer", "mlro", "internal_auditor", "admin", "institution_partner")
   network() {
     const picture = this.dataStore.operatingPicture();
     return {
@@ -71,6 +68,7 @@ export class AppController {
   }
 
   @Get("payments")
+  @Roles("analyst", "fraud_investigator", "compliance_officer", "admin")
   payments() {
     return this.dataStore.operatingPicture().payments;
   }
@@ -79,17 +77,19 @@ export class AppController {
   @Roles("fraud_investigator", "compliance_officer", "admin")
   recallPayment(
     @Param("id") id: string,
-    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Req() request: RequestWithUser,
   ) {
-    return this.dataStore.recallPayment(id, actorFrom(headers), roleFrom(headers));
+    return this.dataStore.recallPayment(id, actorFrom(request), roleFrom(request));
   }
 
   @Get("cases")
+  @Roles("analyst", "fraud_investigator", "compliance_officer", "mlro", "internal_auditor", "admin")
   cases() {
     return this.dataStore.operatingPicture().cases;
   }
 
   @Get("cases/:id")
+  @Roles("analyst", "fraud_investigator", "compliance_officer", "mlro", "internal_auditor", "admin")
   case(@Param("id") id: string) {
     return this.dataStore.caseById(id);
   }
@@ -99,9 +99,9 @@ export class AppController {
   updateCaseStatus(
     @Param("id") id: string,
     @Body() body: { status: CaseStatus },
-    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Req() request: RequestWithUser,
   ) {
-    return this.dataStore.updateCaseStatus(id, body.status, actorFrom(headers), roleFrom(headers));
+    return this.dataStore.updateCaseStatus(id, body.status, actorFrom(request), roleFrom(request));
   }
 
   @Get("cases/:id/copilot")
@@ -117,11 +117,13 @@ export class AppController {
   }
 
   @Get("graph")
+  @Roles("analyst", "fraud_investigator", "compliance_officer", "mlro", "internal_auditor", "admin")
   graph() {
     return this.dataStore.operatingPicture().graph;
   }
 
   @Get("aml/customers")
+  @Roles("analyst", "fraud_investigator", "compliance_officer", "mlro", "internal_auditor", "admin")
   amlCustomers() {
     return this.dataStore.operatingPicture().amlCustomers;
   }
@@ -169,6 +171,7 @@ export class AppController {
   }
 
   @Get("training")
+  @Roles("analyst", "fraud_investigator", "compliance_officer", "mlro", "admin", "institution_partner")
   training() {
     return this.dataStore.trainingAcademy();
   }

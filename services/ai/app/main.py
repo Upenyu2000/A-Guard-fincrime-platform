@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from typing import Any, Literal
 
 import numpy as np
@@ -112,9 +111,9 @@ MODEL = IsolationForest(n_estimators=120, contamination=0.12, random_state=42)
 MODEL.fit(TRAINING)
 
 app = FastAPI(
-    title="African Guard AI Investigation Service",
+    title="African Guard Risk Analysis Service",
     version="0.1.0",
-    description="AI/ML scoring, explainability, drift, and investigation copilot service.",
+    description="Internal risk analysis service.",
 )
 
 
@@ -156,13 +155,7 @@ def level(score: int) -> str:
 
 @app.get("/health")
 def health() -> dict[str, Any]:
-    return {
-        "status": "ok",
-        "service": "african-guard-ai",
-        "model": "IsolationForest + deterministic feature attribution",
-        "shap_available": SHAP_AVAILABLE,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    }
+    return {"status": "ok"}
 
 
 @app.post("/score")
@@ -293,7 +286,7 @@ def feedback(request: FeedbackRequest) -> dict[str, Any]:
 @app.get("/model/drift")
 def drift() -> dict[str, Any]:
     return {
-        "model_version": "hybrid-risk-2026.07",
+        "model_version": "AG-RISK-2026.1",
         "drift_index": 0.17,
         "status": "healthy",
         "watchlist_features": ["payment_delay_seconds", "beneficiary_risk", "geo_velocity_kmh"],

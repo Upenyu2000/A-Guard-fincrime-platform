@@ -5,7 +5,7 @@ import { MiniBar } from "./aml-ui";
 
 const labels: Array<[keyof AmlScoreBreakdown, string]> = [
   ["deterministicRules", "Rules"],
-  ["mlAnomaly", "ML anomaly"],
+  ["mlAnomaly", "Anomaly intelligence"],
   ["behaviouralProfile", "Behaviour"],
   ["identityGraph", "Graph"],
   ["amlSanctions", "AML/sanctions"],

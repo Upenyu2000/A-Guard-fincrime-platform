@@ -58,8 +58,8 @@ export class FraudEngineService {
       latency_ms,
       explainability: {
         top_factors: topFactors,
-        model_version: "hybrid-risk-2026.07",
-        policy_version: "african-guard-policy-v1",
+        model_version: "AG-RISK-2026.1",
+        policy_version: "AG-POLICY-FRAUD-1.0",
       },
     };
   }
@@ -180,7 +180,7 @@ export class FraudEngineService {
 
   private reasons(ruleHits: RuleHit[], scores: ComponentScores, sanctionsHit?: boolean): string[] {
     const reasons = ruleHits.map((hit) => hit.reason);
-    if (scores.ml_anomaly >= 65) reasons.push("ML anomaly outlier");
+    if (scores.ml_anomaly >= 65) reasons.push("behavioural anomaly outlier");
     if (scores.behavioural_profile >= 60) reasons.push("behaviour profile deviation");
     if (scores.identity_graph >= 65) reasons.push("identity graph risk propagation");
     if (sanctionsHit) reasons.push("sanctions screening hit");

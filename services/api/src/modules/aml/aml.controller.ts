@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Headers, Param, Patch, Post, Query } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Query, Req } from "@nestjs/common";
 import { UserRole } from "../../domain";
+import { AuthenticatedUser } from "../security/rbac.guard";
 import { Roles } from "../security/roles.decorator";
 import { AmlService } from "./aml.service";
 import {
@@ -16,19 +17,13 @@ import {
   ScreeningRequestDto,
 } from "./dto/aml.dto";
 
-const actorFrom = (headers: Record<string, string | string[] | undefined>) => {
-  const value = headers["x-actor"];
-  return Array.isArray(value) ? value[0] ?? "local-user" : value ?? "local-user";
+type RequestWithUser = {
+  user?: AuthenticatedUser;
 };
 
-const roleFrom = (headers: Record<string, string | string[] | undefined>) => {
-  const value = headers["x-role"];
-  return ((Array.isArray(value) ? value[0] : value) ?? "admin") as UserRole;
-};
-
-const contextFrom = (headers: Record<string, string | string[] | undefined>) => ({
-  actor: actorFrom(headers),
-  role: roleFrom(headers),
+const contextFrom = (request: RequestWithUser) => ({
+  actor: request.user?.actor ?? "system",
+  role: (request.user?.role ?? "admin") as UserRole,
 });
 
 @Controller("aml")
@@ -63,18 +58,18 @@ export class AmlController {
   @Roles("analyst", "fraud_investigator", "compliance_officer", "admin")
   evaluateTransaction(
     @Body() body: EvaluateAmlTransactionDto,
-    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Req() request: RequestWithUser,
   ) {
-    return this.aml.evaluateTransaction(body, contextFrom(headers));
+    return this.aml.evaluateTransaction(body, contextFrom(request));
   }
 
   @Post("transactions/batch-evaluate")
   @Roles("fraud_investigator", "compliance_officer", "admin")
   batchEvaluate(
     @Body() body: BatchEvaluateAmlTransactionsDto,
-    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Req() request: RequestWithUser,
   ) {
-    return this.aml.batchEvaluate(body, contextFrom(headers));
+    return this.aml.batchEvaluate(body, contextFrom(request));
   }
 
   @Get("microtransactions/clusters")
@@ -103,14 +98,14 @@ export class AmlController {
 
   @Post("customers/:id/assess")
   @Roles("compliance_officer", "mlro", "admin")
-  assessCustomer(@Param("id") id: string, @Headers() headers: Record<string, string | string[] | undefined>) {
-    return this.aml.assessCustomer(id, contextFrom(headers));
+  assessCustomer(@Param("id") id: string, @Req() request: RequestWithUser) {
+    return this.aml.assessCustomer(id, contextFrom(request));
   }
 
   @Post("customers/:id/refresh")
   @Roles("fraud_investigator", "compliance_officer", "mlro", "admin")
-  refreshCustomer(@Param("id") id: string, @Headers() headers: Record<string, string | string[] | undefined>) {
-    return this.aml.refreshCustomer(id, contextFrom(headers));
+  refreshCustomer(@Param("id") id: string, @Req() request: RequestWithUser) {
+    return this.aml.refreshCustomer(id, contextFrom(request));
   }
 
   @Get("businesses")
@@ -127,20 +122,20 @@ export class AmlController {
 
   @Post("businesses/:id/assess")
   @Roles("compliance_officer", "mlro", "admin")
-  assessBusiness(@Param("id") id: string, @Headers() headers: Record<string, string | string[] | undefined>) {
-    return this.aml.assessBusiness(id, contextFrom(headers));
+  assessBusiness(@Param("id") id: string, @Req() request: RequestWithUser) {
+    return this.aml.assessBusiness(id, contextFrom(request));
   }
 
   @Post("businesses/:id/refresh")
   @Roles("fraud_investigator", "compliance_officer", "mlro", "admin")
-  refreshBusiness(@Param("id") id: string, @Headers() headers: Record<string, string | string[] | undefined>) {
-    return this.aml.refreshBusiness(id, contextFrom(headers));
+  refreshBusiness(@Param("id") id: string, @Req() request: RequestWithUser) {
+    return this.aml.refreshBusiness(id, contextFrom(request));
   }
 
   @Post("screening")
   @Roles("compliance_officer", "mlro", "admin")
-  createScreening(@Body() body: ScreeningRequestDto, @Headers() headers: Record<string, string | string[] | undefined>) {
-    return this.aml.createScreening(body, contextFrom(headers));
+  createScreening(@Body() body: ScreeningRequestDto, @Req() request: RequestWithUser) {
+    return this.aml.createScreening(body, contextFrom(request));
   }
 
   @Get("screening/:id")
@@ -157,14 +152,14 @@ export class AmlController {
 
   @Post("rules")
   @Roles("rule_administrator", "admin")
-  createRule(@Body() body: CreateAmlRuleDto, @Headers() headers: Record<string, string | string[] | undefined>) {
-    return this.aml.createRule(body, contextFrom(headers));
+  createRule(@Body() body: CreateAmlRuleDto, @Req() request: RequestWithUser) {
+    return this.aml.createRule(body, contextFrom(request));
   }
 
   @Patch("rules/:id")
   @Roles("rule_administrator", "admin")
-  patchRule(@Param("id") id: string, @Body() body: PatchAmlRuleDto, @Headers() headers: Record<string, string | string[] | undefined>) {
-    return this.aml.patchRule(id, body, contextFrom(headers));
+  patchRule(@Param("id") id: string, @Body() body: PatchAmlRuleDto, @Req() request: RequestWithUser) {
+    return this.aml.patchRule(id, body, contextFrom(request));
   }
 
   @Post("rules/:id/test")
@@ -175,26 +170,26 @@ export class AmlController {
 
   @Post("rules/:id/backtest")
   @Roles("rule_administrator", "compliance_officer", "admin")
-  backtestRule(@Param("id") id: string, @Headers() headers: Record<string, string | string[] | undefined>) {
-    return this.aml.backtestRule(id, contextFrom(headers));
+  backtestRule(@Param("id") id: string, @Req() request: RequestWithUser) {
+    return this.aml.backtestRule(id, contextFrom(request));
   }
 
   @Post("rules/:id/approve")
   @Roles("compliance_officer", "mlro", "admin")
-  approveRule(@Param("id") id: string, @Headers() headers: Record<string, string | string[] | undefined>) {
-    return this.aml.approveRule(id, contextFrom(headers));
+  approveRule(@Param("id") id: string, @Req() request: RequestWithUser) {
+    return this.aml.approveRule(id, contextFrom(request));
   }
 
   @Post("rules/:id/activate")
   @Roles("compliance_officer", "mlro", "admin")
-  activateRule(@Param("id") id: string, @Headers() headers: Record<string, string | string[] | undefined>) {
-    return this.aml.activateRule(id, contextFrom(headers));
+  activateRule(@Param("id") id: string, @Req() request: RequestWithUser) {
+    return this.aml.activateRule(id, contextFrom(request));
   }
 
   @Post("rules/:id/deactivate")
   @Roles("compliance_officer", "mlro", "admin")
-  deactivateRule(@Param("id") id: string, @Headers() headers: Record<string, string | string[] | undefined>) {
-    return this.aml.deactivateRule(id, contextFrom(headers));
+  deactivateRule(@Param("id") id: string, @Req() request: RequestWithUser) {
+    return this.aml.deactivateRule(id, contextFrom(request));
   }
 
   @Get("alerts")
@@ -211,32 +206,32 @@ export class AmlController {
 
   @Patch("alerts/:id")
   @Roles("analyst", "fraud_investigator", "compliance_officer", "admin")
-  patchAlert(@Param("id") id: string, @Body() body: PatchAmlAlertDto, @Headers() headers: Record<string, string | string[] | undefined>) {
-    return this.aml.patchAlert(id, body, contextFrom(headers));
+  patchAlert(@Param("id") id: string, @Body() body: PatchAmlAlertDto, @Req() request: RequestWithUser) {
+    return this.aml.patchAlert(id, body, contextFrom(request));
   }
 
   @Post("alerts/:id/assign")
   @Roles("analyst", "fraud_investigator", "compliance_officer", "admin")
-  assignAlert(@Param("id") id: string, @Body() body: AssignAmlAlertDto, @Headers() headers: Record<string, string | string[] | undefined>) {
-    return this.aml.assignAlert(id, body, contextFrom(headers));
+  assignAlert(@Param("id") id: string, @Body() body: AssignAmlAlertDto, @Req() request: RequestWithUser) {
+    return this.aml.assignAlert(id, body, contextFrom(request));
   }
 
   @Post("alerts/:id/escalate")
   @Roles("fraud_investigator", "compliance_officer", "mlro", "admin")
-  escalateAlert(@Param("id") id: string, @Body() body: AmlActionReasonDto, @Headers() headers: Record<string, string | string[] | undefined>) {
-    return this.aml.escalateAlert(id, body, contextFrom(headers));
+  escalateAlert(@Param("id") id: string, @Body() body: AmlActionReasonDto, @Req() request: RequestWithUser) {
+    return this.aml.escalateAlert(id, body, contextFrom(request));
   }
 
   @Post("alerts/:id/convert-to-case")
   @Roles("fraud_investigator", "compliance_officer", "mlro", "admin")
-  convertAlert(@Param("id") id: string, @Body() body: AmlActionReasonDto, @Headers() headers: Record<string, string | string[] | undefined>) {
-    return this.aml.convertAlertToCase(id, body, contextFrom(headers));
+  convertAlert(@Param("id") id: string, @Body() body: AmlActionReasonDto, @Req() request: RequestWithUser) {
+    return this.aml.convertAlertToCase(id, body, contextFrom(request));
   }
 
   @Post("alerts/:id/close")
   @Roles("fraud_investigator", "compliance_officer", "mlro", "admin")
-  closeAlert(@Param("id") id: string, @Body() body: CloseAmlAlertDto, @Headers() headers: Record<string, string | string[] | undefined>) {
-    return this.aml.closeAlert(id, body, contextFrom(headers));
+  closeAlert(@Param("id") id: string, @Body() body: CloseAmlAlertDto, @Req() request: RequestWithUser) {
+    return this.aml.closeAlert(id, body, contextFrom(request));
   }
 
   @Get("sar-drafts")
@@ -247,14 +242,14 @@ export class AmlController {
 
   @Post("sar-drafts")
   @Roles("compliance_officer", "mlro", "admin")
-  createSarDraft(@Body() body: CreateSarDraftDto, @Headers() headers: Record<string, string | string[] | undefined>) {
-    return this.aml.createSarDraft(body, contextFrom(headers));
+  createSarDraft(@Body() body: CreateSarDraftDto, @Req() request: RequestWithUser) {
+    return this.aml.createSarDraft(body, contextFrom(request));
   }
 
   @Post("sar-drafts/:id/approve")
   @Roles("mlro", "admin")
-  approveSarDraft(@Param("id") id: string, @Body() body: AmlActionReasonDto, @Headers() headers: Record<string, string | string[] | undefined>) {
-    return this.aml.approveSarDraft(id, body, contextFrom(headers));
+  approveSarDraft(@Param("id") id: string, @Body() body: AmlActionReasonDto, @Req() request: RequestWithUser) {
+    return this.aml.approveSarDraft(id, body, contextFrom(request));
   }
 
   @Get("audit")

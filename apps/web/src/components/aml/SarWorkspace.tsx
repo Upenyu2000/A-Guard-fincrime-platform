@@ -34,7 +34,7 @@ export function SarWorkspace({
                   <StatusPill tone={tone}>{draft.mlroReviewStatus.replaceAll("_", " ")}</StatusPill>
                 </div>
                 <div className="mt-4 rounded-lg border border-fuchsia-300/15 bg-fuchsia-400/10 p-3">
-                  <p className="text-xs uppercase tracking-[0.12em] text-fuchsia-100/70">AI-generated draft requiring human validation</p>
+                  <p className="text-xs uppercase tracking-[0.12em] text-fuchsia-100/70">Decision Intelligence draft requiring human validation</p>
                   <p className="mt-2 text-sm leading-6 text-white/72">{draft.narrative}</p>
                 </div>
                 <div className="mt-4 grid gap-2 text-xs text-white/55 sm:grid-cols-2">

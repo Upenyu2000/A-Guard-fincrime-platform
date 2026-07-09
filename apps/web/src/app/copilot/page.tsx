@@ -3,7 +3,7 @@ import { OperatingConsole } from "@/components/OperatingConsole";
 
 export const metadata: Metadata = {
   title: "Fraud Copilot | African Guard",
-  description: "African Guard AI investigation copilot for case explanation, linked entities, and SAR draft support.",
+  description: "African Guard Financial Crime Copilot for case explanation, linked entities, and SAR draft support.",
 };
 
 export default function CopilotPage() {

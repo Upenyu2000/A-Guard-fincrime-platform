@@ -459,7 +459,7 @@ export const amlKycMandate: AmlKycMandate = {
 };
 
 export const learning: LearningState = {
-  modelVersion: "hybrid-risk-2026.07",
+  modelVersion: "AG-RISK-2026.1",
   lastRetrainedAt: minutesAgo(60 * 26),
   driftIndex: 0.17,
   labelledCases: 12842,
@@ -848,7 +848,7 @@ export const suggestedRules: SuggestedRule[] = [
     description:
       "Review or hold merchants under 90 days old, with no acquiring transactions, when their device has been used by more than five accounts.",
     logic:
-      "merchant.age_days < 90 AND merchant.acquiring_txn_count = 0 AND device.distinct_account_count > 5",
+      "Restricted rule expression - available to authorised rule administrators.",
     expectedFireRate: 1.8,
     expectedFalsePositiveReduction: 22,
     action: "review",
@@ -861,7 +861,7 @@ export const suggestedRules: SuggestedRule[] = [
     description:
       "Escalate merchants dormant for at least 60 days when session activity rises more than 300 percent and device risk exceeds 70.",
     logic:
-      "merchant.dormant_days >= 60 AND session.spike_pct > 300 AND device.risk_score >= 70",
+      "Restricted rule expression - available to authorised rule administrators.",
     expectedFireRate: 2.4,
     expectedFalsePositiveReduction: 18,
     action: "step_up",

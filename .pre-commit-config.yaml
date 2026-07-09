@@ -1,0 +1,8 @@
+repos:
+  - repo: local
+    hooks:
+      - id: african-guard-secret-scan
+        name: African Guard tracked-file secret scan
+        entry: node scripts/security/scan-secrets.mjs
+        language: system
+        pass_filenames: false

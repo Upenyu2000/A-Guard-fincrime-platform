@@ -20,10 +20,16 @@ spec:
           ports:
             - containerPort: 3000
           env:
-            - name: NEXT_PUBLIC_API_URL
-              value: https://api.african-guard.example
-            - name: NEXT_PUBLIC_WS_URL
-              value: https://api.african-guard.example
+            - name: PUBLIC_API_GATEWAY_URL
+              valueFrom:
+                secretKeyRef:
+                  name: african-guard-public-gateway
+                  key: api-url
+            - name: PUBLIC_WS_GATEWAY_URL
+              valueFrom:
+                secretKeyRef:
+                  name: african-guard-public-gateway
+                  key: ws-url
           resources:
             requests:
               cpu: 200m

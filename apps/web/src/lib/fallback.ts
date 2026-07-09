@@ -167,7 +167,7 @@ export const fallbackPicture: OperatingPicture = {
     consequences: ["Regulatory fines and sanctions enforcement", "Criminal exposure for willful non-compliance", "Loss of banking, LP, and counterparty confidence"],
   },
   learning: {
-    modelVersion: "hybrid-risk-2026.07",
+    modelVersion: "AG-RISK-2026.1",
     lastRetrainedAt: iso(1560),
     driftIndex: 0.17,
     labelledCases: 12842,
@@ -323,7 +323,7 @@ export const fallbackPicture: OperatingPicture = {
         id: "rule-new-merchant-reused-device",
         name: "New merchant with reused operator device",
         description: "Review merchants under 90 days old, with no acquiring transactions, when their device has been used by more than five accounts.",
-        logic: "merchant.age_days < 90 AND merchant.acquiring_txn_count = 0 AND device.distinct_account_count > 5",
+        logic: "Restricted rule expression - available to authorised rule administrators.",
         expectedFireRate: 1.8,
         expectedFalsePositiveReduction: 22,
         action: "review",

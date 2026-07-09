@@ -26,7 +26,7 @@ const sectionTabs: Record<string, { tab: AmlTabId; title: string; description: s
   screening: {
     tab: "screening",
     title: "Screening",
-    description: "Review sanctions, PEP, adverse-media, identity, company, and provider-independent screening results.",
+    description: "Review sanctions, PEP, adverse-media, identity, company, and controlled screening results.",
   },
   rules: {
     tab: "rules",

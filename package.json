@@ -15,6 +15,10 @@
     "lint": "npm run lint -w @african-guard/web && npm run lint -w @african-guard/api",
     "typecheck": "npm run typecheck -w @african-guard/web && npm run typecheck -w @african-guard/api",
     "test:aml": "npm run test:aml -w @african-guard/api",
+    "test:security": "npm run test:security -w @african-guard/api",
+    "security:secrets": "node scripts/security/scan-secrets.mjs",
+    "security:bundle": "node scripts/security/scan-frontend-bundle.mjs",
+    "security:scan": "npm run security:secrets && npm run security:bundle",
     "test:ai": "python services/ai/tests/test_score.py",
     "ai": "python -m uvicorn services.ai.app.main:app --reload --host 0.0.0.0 --port 8001",
     "prisma:generate": "npm run prisma:generate -w @african-guard/api"

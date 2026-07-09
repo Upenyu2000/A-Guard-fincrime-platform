@@ -11,10 +11,32 @@ jobs:
   build-and-smoke-test:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      POSTGRES_USER: ci-placeholder-user
+      POSTGRES_PASSWORD: ci-placeholder-password
+      POSTGRES_DB: african_guard_ci
+      DATABASE_URL: postgresql://ci-placeholder-user:ci-placeholder-password@postgres:5432/african_guard_ci
+      REDIS_URL: redis://redis:6379
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_USERNAME: ci-placeholder-user
+      KAFKA_PASSWORD: ci-placeholder-password
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: ci-placeholder-user
+      NEO4J_PASSWORD: ci-placeholder-password
+      AI_SERVICE_TOKEN: ci-placeholder-risk-service-token
+      JWT_SECRET: ci-placeholder-jwt-secret-value-12345
+      CONSORTIUM_SHARED_SECRET: ci-placeholder-consortium-secret-value
+      PUBLIC_API_GATEWAY_URL: http://api:4000
+      PUBLIC_WS_GATEWAY_URL: http://api:4000
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Run Gitleaks secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -28,7 +50,11 @@ jobs:
       - name: Type-check and build workspaces
         run: |
           npm run typecheck
+          npm run test:aml
+          npm run test:security
+          npm run security:secrets
           npm run build
+          npm run security:bundle
 
       - name: Validate Compose configuration
         run: docker compose config

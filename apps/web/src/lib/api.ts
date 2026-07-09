@@ -1,14 +1,13 @@
 import { fallbackPicture } from "./fallback";
 import { AgentRunResult, OperatingPicture, OsintFinding, RiskDecision } from "./types";
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
-export const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? "http://localhost:4000";
+export const API_URL = "/api/gateway";
+export const WS_URL = "";
 
 export async function fetchOperatingPicture(): Promise<OperatingPicture> {
   try {
     const response = await fetch(`${API_URL}/v1/operating-picture`, {
       cache: "no-store",
-      headers: { "x-role": "admin" },
     });
     if (!response.ok) throw new Error(`API returned ${response.status}`);
     return (await response.json()) as OperatingPicture;
@@ -22,8 +21,6 @@ export async function recallPayment(id: string) {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "x-role": "fraud_investigator",
-      "x-actor": "console.user",
     },
   });
   if (!response.ok) throw new Error(`Recall failed with ${response.status}`);
@@ -35,7 +32,6 @@ export async function scoreSyntheticEvent(): Promise<RiskDecision> {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "x-role": "analyst",
     },
     body: JSON.stringify({
       event_type: "transaction",
@@ -77,7 +73,6 @@ export async function chatCase(caseId: string, prompt: string) {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "x-role": "fraud_investigator",
     },
     body: JSON.stringify({ prompt }),
   });
@@ -90,7 +85,6 @@ export async function submitFeedback(caseId: string, label: string) {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "x-role": "analyst",
     },
     body: JSON.stringify({
       caseId,
@@ -108,7 +102,6 @@ export async function runAgent(prompt: string, agentId?: string, entityName?: st
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "x-role": "fraud_investigator",
     },
     body: JSON.stringify({ prompt, agentId, entityName }),
   });
@@ -121,7 +114,6 @@ export async function osintSearch(entityName: string): Promise<OsintFinding> {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "x-role": "compliance_officer",
     },
     body: JSON.stringify({ entityName }),
   });

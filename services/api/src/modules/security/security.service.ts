@@ -4,7 +4,7 @@ import { AuditEvent, UserRole } from "../../domain";
 
 @Injectable()
 export class SecurityService {
-  private readonly secret = process.env.CONSORTIUM_SHARED_SECRET ?? "local-dev-secret";
+  private readonly secret = this.resolveConsortiumSecret();
 
   pseudonymize(value: string): string {
     return createHmac("sha256", this.secret).update(value).digest("hex").slice(0, 12);
@@ -59,5 +59,14 @@ export class SecurityService {
       metadata,
       createdAt: new Date().toISOString(),
     };
+  }
+
+  private resolveConsortiumSecret() {
+    const secret = process.env.CONSORTIUM_SHARED_SECRET;
+    if (secret && !secret.includes("<")) return secret;
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("Consortium secret is not configured.");
+    }
+    return "local-development-placeholder";
   }
 }

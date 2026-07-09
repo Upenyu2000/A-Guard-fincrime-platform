@@ -91,10 +91,10 @@ const moduleLinks: Array<{
   { section: "payments", label: "Payment tracking", href: "/payments", description: "Stop, recall, and route high-risk payments.", icon: CreditCard },
   { section: "graph", label: "Identity graph", href: "/graph", description: "Fraud-ring relationships, consortium intelligence, and typologies.", icon: GitBranch },
   { section: "cases", label: "Cases", href: "/cases", description: "Investigation workspace, exposure, recovery, timeline, and evidence.", icon: FileWarning },
-  { section: "copilot", label: "Copilot", href: "/copilot", description: "AI-assisted case explanation, entity linking, and SAR drafting prompts.", icon: Bot },
+  { section: "copilot", label: "Copilot", href: "/copilot", description: "Financial Crime Copilot for case explanation, entity linking, and SAR drafting prompts.", icon: Bot },
   { section: "agents", label: "Agents", href: "/agents", description: "Agentic fraud and AML workflows, prompt library, merchant risk, and enablement.", icon: Sparkles },
   { section: "aml", label: "AML workspace", href: "/aml", description: "Dedicated AML, KYC, KYB, screening, SAR, and transaction-governance workspace.", icon: Landmark },
-  { section: "learning", label: "AI learning", href: "/learning", description: "Feedback queue, drift, false-positive rate, and model lift.", icon: Brain },
+  { section: "learning", label: "Learning", href: "/learning", description: "Feedback queue, drift, false-positive rate, and risk-engine lift.", icon: Brain },
   { section: "security", label: "Security", href: "/security", description: "Audit stream, controls, RBAC, rate limiting, and envelope protection.", icon: LockKeyhole },
 ];
 
@@ -213,7 +213,7 @@ function OperatingSection({ section, picture }: { section: OperatingConsoleSecti
       );
     case "learning":
       return (
-        <PageShell eyebrow="AI learning" title="Feedback and drift">
+        <PageShell eyebrow="Decision Intelligence learning" title="Feedback and drift">
           <div className="grid gap-4 xl:grid-cols-[minmax(0,0.7fr)_minmax(420px,0.55fr)]">
             <LearningSystem picture={picture} />
             <AmlConvergence picture={picture} />
@@ -1064,7 +1064,7 @@ function LearningSystem({ picture }: { picture: OperatingPicture }) {
     <section className="panel p-4">
       <SectionHeader
         icon={Brain}
-        eyebrow="AI learning"
+        eyebrow="Decision Intelligence learning"
         title="Feedback and drift"
         action={
           <button
