@@ -1,0 +1,24 @@
+sequenceDiagram
+  actor Analyst
+  participant Web as Next.js Console
+  participant API as NestJS API
+  participant Engine as Fraud Engine
+  participant AI as Risk Analysis Service
+  participant DB as Operational Store
+  participant WS as WebSocket Gateway
+
+  Web->>API: Submit transaction/login/device event
+  API->>Engine: Evaluate rules, behaviour, graph and AML signals
+  Engine->>AI: Request hybrid risk score and explanation
+  AI-->>Engine: Score, reasons and recommended action
+  Engine->>DB: Store decision and evidence
+  alt High-risk event
+    Engine->>DB: Create alert / investigation case
+    API->>WS: Publish fraud.alert and operating.picture
+    WS-->>Web: Push live update
+    Analyst->>Web: Review alert, payment, graph and case
+    Web->>API: Submit disposition / feedback
+    API->>DB: Record outcome and audit event
+  else Low-risk event
+    API-->>Web: Return approved decision
+  end
