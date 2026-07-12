@@ -1,0 +1,31 @@
+# Secrets and environment files
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+secrets/
+credentials/
+
+# Evidence that may contain sensitive data
+evidence/raw/
+captures/
+*.pcap
+*.pcapng
+*.evtx
+
+# Tool output
+BloodHound/
+bloodhound-data/
+loot/
+reports/private/
+__pycache__/
+*.pyc
+
+# Editors and operating systems
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
