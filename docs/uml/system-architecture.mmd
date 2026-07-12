@@ -1,0 +1,23 @@
+flowchart LR
+  Analyst[Fraud / AML Analyst] --> Web[Next.js Operating Console]
+  Web -->|REST| API[NestJS API]
+  Web <-->|WebSocket alerts| WS[WebSocket Gateway]
+  API --> Engine[Fraud Scoring Engine]
+  API --> Cases[Case Management]
+  API --> Payments[Payment Tracking]
+  API --> Graph[Identity Graph Intelligence]
+  API --> AML[AML / Screening Workspace]
+  API --> Audit[RBAC, Rate Limiting & Audit]
+  Engine --> AI[A-Guard Risk Analysis Service]
+  AI --> Explain[Explainability / SAR / Summaries]
+  Engine --> Data[(Operational Data Store)]
+  Cases --> Data
+  Payments --> Data
+  Graph --> Data
+  AML --> Data
+  Data --> Learning[Analyst Feedback & Model Monitoring]
+  Learning --> Engine
+  API --> WS
+  K8s[Kubernetes Manifests] -. deploys .-> Web
+  K8s -. deploys .-> API
+  K8s -. deploys .-> AI
